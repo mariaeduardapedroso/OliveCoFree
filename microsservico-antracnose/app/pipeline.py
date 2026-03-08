@@ -7,6 +7,7 @@ Duas responsabilidades:
 
 Dados carregados diretamente do repositorio GitHub (sem ficheiros locais).
 """
+import unicodedata
 import pandas as pd
 import numpy as np
 from .config import (
@@ -53,13 +54,18 @@ def preparar_dataset_treino() -> pd.DataFrame:
         frames.append(df)
 
     df_antracnose = pd.concat(frames, ignore_index=True)
+    # Normalizar nomes: remover espacos, acentos e lowercase
+    df_antracnose.columns = [
+        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
+        for c in df_antracnose.columns
+    ]
     df_antracnose = df_antracnose.rename(columns={
-        'Data': 'data',
-        'Olival/Parcela': 'parcela',
-        'Arvore': 'arvore',
-        'Azeitona': 'azeitona',
-        'Severidade': 'severidade',
-        'Incidencia': 'incidencia',
+        'data': 'data',
+        'olival/parcela': 'parcela',
+        'arvore': 'arvore',
+        'azeitona': 'azeitona',
+        'severidade': 'severidade',
+        'incidencia': 'incidencia',
     })
     df_antracnose['data'] = pd.to_datetime(df_antracnose['data'])
     df_antracnose['semana_do_ano'] = df_antracnose['data'].dt.isocalendar().week.astype(int)
