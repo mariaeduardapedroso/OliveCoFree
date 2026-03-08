@@ -5,7 +5,7 @@ Serviço independente que recebe dados climáticos de uma semana
 e retorna a previsão de infeção por Olho de Pavão.
 
 Modelo: Logistic Regression (Análise 3 do notebook)
-Treino: Dados de campo 2021-2023 + clima de Mirandela
+Treino: Dados de campo 2021-2023, 2025 (GitHub) + clima de Mirandela
 Porta: 8002
 """
 from contextlib import asynccontextmanager

@@ -1,25 +1,23 @@
 """
-Configurações do Microsserviço Olho de Pavão
+Configuracoes do Microsservico Olho de Pavao
 """
-import os
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-
-# Ficheiros de dados (usados APENAS para treino)
-FICHEIROS_DOENCA = [
-    os.path.join(DATA_DIR, "2021_Data_Olive_leaf_spot_Trat1.xlsx"),
-    os.path.join(DATA_DIR, "2022_Data_Olive_leaf_spot_Trat1.xlsx"),
-    os.path.join(DATA_DIR, "2023_Data_Olive_leaf_spot_Trat1.xlsx"),
+# URLs dos dados no GitHub (carregados em tempo de execucao)
+URLS_DOENCA = [
+    "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2021_Data_Olive%20leaf%20spot%20Trat1.xlsx",
+    "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2022_Data_Olive%20leaf%20spot%20Trat1.xlsx",
+    "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2023_Data_Olive%20leaf%20spot%20Trat1.xlsx",
+    "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2025_Data_Olive%20leaf%20spot.xlsx",
 ]
-FICHEIRO_CLIMA = os.path.join(DATA_DIR, "clima.xlsx")
+URL_CLIMA = "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/clima.xlsx"
+SHEET_CLIMA = "Mirandela"
 
-# Threshold para classificação binária no treino (% infectadas)
+# Threshold para classificacao binaria no treino (% infectadas)
 PERCENTAGEM_INFECTADO = 10
 
-# Thresholds para classificação baixo/medio/alto (probabilidade do modelo)
-THRESHOLD_MEDIO = 40.0   # >= 40% → medio
-THRESHOLD_ALTO = 60.0    # >= 60% → alto
+# Thresholds para classificacao baixo/medio/alto (probabilidade do modelo)
+THRESHOLD_MEDIO = 40.0   # >= 40% -> medio
+THRESHOLD_ALTO = 60.0    # >= 60% -> alto
 
 # Features usadas no componente ML do modelo
 FEATURES_MODELO = [
@@ -31,5 +29,5 @@ FEATURES_MODELO = [
     'indice_favorabilidade_semana',
 ]
 
-# Porta do serviço
+# Porta do servico
 PORT = 8002
