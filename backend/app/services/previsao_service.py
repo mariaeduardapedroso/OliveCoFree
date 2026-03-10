@@ -1,10 +1,11 @@
 """
 Serviço de Previsão
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
-import random
+import httpx
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -12,6 +13,9 @@ from sqlalchemy import desc
 from ..models.previsao import Previsao
 from ..models.doenca import Doenca
 from ..schemas.previsao import PrevisaoCreate
+from ..config import MICROSSERVICO_OLHO_PAVAO_URL, MICROSSERVICO_ANTRACNOSE_URL
+
+logger = logging.getLogger(__name__)
 
 
 def calcular_risco(percentual: float, doenca_id: str, db: Session) -> str:
@@ -32,88 +36,86 @@ def calcular_risco(percentual: float, doenca_id: str, db: Session) -> str:
     return "baixo"
 
 
-def calcular_previsao_mock(temperatura: float, humidade: float, precipitacao: float, doenca_id: str) -> float:
-    """
-    Calcula previsão mock baseada nos dados climáticos.
-    Em produção, isso seria substituído pelo modelo ML real.
-    """
-    percentual = 0
-
-    if doenca_id == 'olho-pavao':
-        # Olho de Pavão: Temperatura ótima 15-20°C, humidade alta
-        if 15 <= temperatura <= 20:
-            percentual += 10
-        elif 10 <= temperatura <= 25:
-            percentual += 5
-
-        if humidade >= 80:
-            percentual += 12
-        elif humidade >= 70:
-            percentual += 6
-        elif humidade >= 60:
-            percentual += 2
-
-        if precipitacao >= 30:
-            percentual += 8
-        elif precipitacao >= 15:
-            percentual += 4
-        elif precipitacao >= 5:
-            percentual += 2
-    else:
-        # Antracnose: Temperatura ótima 10-25°C, favorece mais com chuva
-        if 15 <= temperatura <= 22:
-            percentual += 8
-        elif 10 <= temperatura <= 25:
-            percentual += 4
-
-        if humidade >= 85:
-            percentual += 10
-        elif humidade >= 75:
-            percentual += 5
-        elif humidade >= 65:
-            percentual += 2
-
-        if precipitacao >= 40:
-            percentual += 10
-        elif precipitacao >= 20:
-            percentual += 6
-        elif precipitacao >= 8:
-            percentual += 3
-
-    # Adicionar variação aleatória para simular incerteza
-    variacao = (random.random() - 0.5) * 6
-    percentual = max(0, min(100, percentual + variacao))
-
-    return round(percentual, 1)
+_MICROSSERVICO_URLS = {
+    "olho-pavao": MICROSSERVICO_OLHO_PAVAO_URL,
+    "antracnose": MICROSSERVICO_ANTRACNOSE_URL,
+}
 
 
-def criar_previsao(
+async def chamar_microsservico(
+    doenca_id: str,
+    semana: int,
+    ano: int,
+    temperatura: float,
+    temperatura_maxima: float,
+    temperatura_minima: float,
+    humidade: float,
+    precipitacao: float,
+    velocidade_vento: float,
+) -> dict:
+    """Chama o microsserviço de previsão correspondente à doença."""
+    base_url = _MICROSSERVICO_URLS.get(doenca_id)
+    if not base_url:
+        raise Exception(f"Doença desconhecida: {doenca_id}")
+
+    payload = {
+        "semana": semana,
+        "ano": ano,
+        "temperatura_media": temperatura,
+        "temperatura_maxima": temperatura_maxima,
+        "temperatura_minima": temperatura_minima,
+        "humidade": humidade,
+        "precipitacao": precipitacao,
+        "velocidade_vento": velocidade_vento or 0.0,
+    }
+
+    url = f"{base_url}/previsao"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=30.0)
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError:
+        logger.error(f"Microsserviço {doenca_id} indisponível em {url}")
+        raise Exception(
+            f"Microsserviço de {doenca_id} não está disponível. "
+            f"Verifique se está em execução em {base_url}."
+        )
+    except httpx.TimeoutException:
+        logger.error(f"Timeout ao chamar microsserviço {doenca_id} em {url}")
+        raise Exception(f"Microsserviço de {doenca_id} demorou demais a responder.")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Erro HTTP {e.response.status_code} do microsserviço {doenca_id}")
+        raise Exception(f"Erro ao chamar microsserviço de {doenca_id}: {e.response.status_code}")
+
+
+async def criar_previsao(
     db: Session,
     usuario_id: UUID,
     previsao_data: PrevisaoCreate
 ) -> Previsao:
-    """Cria uma nova previsão"""
-    # Calcular percentual de infecção (mock por enquanto)
-    percentual = calcular_previsao_mock(
-        previsao_data.temperatura or 15.0,
-        previsao_data.humidade or 70.0,
-        previsao_data.precipitacao or 10.0,
-        previsao_data.doenca_id
+    """Cria uma nova previsão chamando o microsserviço correspondente."""
+    resultado = await chamar_microsservico(
+        doenca_id=previsao_data.doenca_id,
+        semana=previsao_data.semana,
+        ano=previsao_data.ano,
+        temperatura=previsao_data.temperatura or 15.0,
+        temperatura_maxima=previsao_data.temperatura_maxima or 20.0,
+        temperatura_minima=previsao_data.temperatura_minima or 10.0,
+        humidade=previsao_data.humidade or 70.0,
+        precipitacao=previsao_data.precipitacao or 10.0,
+        velocidade_vento=previsao_data.velocidade_vento or 0.0,
     )
 
-    # Calcular risco
-    risco = calcular_risco(percentual, previsao_data.doenca_id, db)
+    percentual = resultado["percentual_infeccao"]
+    risco = resultado["classificacao"]
+    confianca = round(resultado["confianca"])
 
-    # Calcular confiança (mock)
-    confianca = random.randint(75, 95)
-
-    # Calcular data baseada na semana/ano
-    from datetime import timedelta
     primeiro_dia_ano = date(previsao_data.ano, 1, 1)
     dias_ate_semana = (previsao_data.semana - 1) * 7
     data_previsao = primeiro_dia_ano + timedelta(days=dias_ate_semana)
 
-    # Criar previsão
     db_previsao = Previsao(
         usuario_id=usuario_id,
         doenca_id=previsao_data.doenca_id,

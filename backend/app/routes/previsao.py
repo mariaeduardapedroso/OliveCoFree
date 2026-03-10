@@ -38,7 +38,13 @@ async def criar_nova_previsao(
     current_user: Usuario = Depends(get_current_user)
 ):
     """Cria uma nova previsão"""
-    nova_previsao = criar_previsao(db, current_user.id, previsao)
+    try:
+        nova_previsao = await criar_previsao(db, current_user.id, previsao)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
     return nova_previsao
 
 

@@ -49,3 +49,7 @@ SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "OliveCoFree")
 
 # Frontend URL (para links de recuperação de senha)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# URLs dos Microsserviços de Previsão
+MICROSSERVICO_OLHO_PAVAO_URL = os.getenv("MICROSSERVICO_OLHO_PAVAO_URL", "http://127.0.0.1:8002")
+MICROSSERVICO_ANTRACNOSE_URL = os.getenv("MICROSSERVICO_ANTRACNOSE_URL", "http://127.0.0.1:8003")
