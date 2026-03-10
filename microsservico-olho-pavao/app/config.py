@@ -16,8 +16,8 @@ SHEET_CLIMA = "Mirandela"
 PERCENTAGEM_INFECTADO = 10
 
 # Thresholds para classificacao baixo/medio/alto (probabilidade do modelo)
-THRESHOLD_MEDIO = 40.0   # >= 40% -> medio
-THRESHOLD_ALTO = 60.0    # >= 60% -> alto
+THRESHOLD_MEDIO = 10.0   # >= 10% -> medio
+THRESHOLD_ALTO = 15.0    # >= 15% -> alto
 
 # Features usadas no componente ML do modelo
 FEATURES_MODELO = [
