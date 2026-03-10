@@ -32,8 +32,10 @@ const Historico = () => {
   const [dadosGraficoPorDoenca, setDadosGraficoPorDoenca] = useState({});
   const [filtroAno, setFiltroAno] = useState('');
   const [filtroDoenca, setFiltroDoenca] = useState('');
+  const [filtroRisco, setFiltroRisco] = useState('');
   const [filtroAnoGrafico, setFiltroAnoGrafico] = useState('');
   const [anosDisponiveis, setAnosDisponiveis] = useState([]);
+  const [ordenacao, setOrdenacao] = useState({ campo: null, direcao: null });
 
   // Estados de paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -51,7 +53,7 @@ const Historico = () => {
     if (!carregando) {
       atualizarTabela();
     }
-  }, [filtroAno, filtroDoenca, paginaAtual, tamanhoPagina]);
+  }, [filtroAno, filtroDoenca, filtroRisco, paginaAtual, tamanhoPagina]);
 
   // Resetar página quando filtros mudam
   const handleFiltroAnoChange = (e) => {
@@ -64,9 +66,15 @@ const Historico = () => {
     setPaginaAtual(1);
   };
 
+  const handleFiltroRiscoChange = (e) => {
+    setFiltroRisco(e.target.value);
+    setPaginaAtual(1);
+  };
+
   const handleLimparFiltros = () => {
     setFiltroAno('');
     setFiltroDoenca('');
+    setFiltroRisco('');
     setPaginaAtual(1);
   };
 
@@ -144,6 +152,41 @@ const Historico = () => {
     setTamanhoPagina(novoTamanho);
     setPaginaAtual(1);
   };
+
+  // Filtrar por risco (client-side) e ordenar
+  const dadosExibidos = React.useMemo(() => {
+    let dados = [...historico];
+
+    // Filtro de risco client-side
+    if (filtroRisco) {
+      dados = dados.filter(item => item.risco === filtroRisco);
+    }
+
+    // Ordenação
+    if (ordenacao.campo && ordenacao.direcao) {
+      dados.sort((a, b) => {
+        let valA = a[ordenacao.campo];
+        let valB = b[ordenacao.campo];
+
+        // Tratar valores nulos
+        if (valA == null) valA = '';
+        if (valB == null) valB = '';
+
+        // Comparação numérica ou string
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return ordenacao.direcao === 'asc' ? valA - valB : valB - valA;
+        }
+
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        if (strA < strB) return ordenacao.direcao === 'asc' ? -1 : 1;
+        if (strA > strB) return ordenacao.direcao === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return dados;
+  }, [historico, filtroRisco, ordenacao]);
 
   // Colunas da tabela
   const colunas = [
@@ -360,7 +403,19 @@ const Historico = () => {
             placeholder="Todos os anos"
             className="w-40 mb-0"
           />
-          {(filtroAno || filtroDoenca) && (
+          <Select
+            name="filtroRisco"
+            value={filtroRisco}
+            onChange={handleFiltroRiscoChange}
+            options={[
+              { valor: 'baixo', label: 'Baixo' },
+              { valor: 'medio', label: 'Médio' },
+              { valor: 'alto', label: 'Alto' }
+            ]}
+            placeholder="Todos os riscos"
+            className="w-40 mb-0"
+          />
+          {(filtroAno || filtroDoenca || filtroRisco) && (
             <Button
               variant="ghost"
               size="sm"
@@ -374,16 +429,18 @@ const Historico = () => {
         {/* Tabela */}
         <Tabela
           colunas={colunas}
-          dados={historico}
+          dados={dadosExibidos}
+          ordenacao={ordenacao}
+          onOrdenacaoChange={setOrdenacao}
         />
 
         {/* Sem resultados */}
-        {historico.length === 0 && (
+        {dadosExibidos.length === 0 && (
           <div className="text-center py-12">
             <History className="mx-auto text-gray-300 mb-3" size={48} />
             <p className="text-gray-500">Nenhuma previsão encontrada</p>
             <p className="text-gray-400 text-sm mt-1">
-              {(filtroAno || filtroDoenca)
+              {(filtroAno || filtroDoenca || filtroRisco)
                 ? 'Tente remover os filtros ou selecionar outras opções'
                 : 'Faça a sua primeira previsão para ver o histórico'
               }

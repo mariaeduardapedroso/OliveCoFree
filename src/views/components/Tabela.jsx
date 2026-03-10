@@ -1,12 +1,38 @@
 /**
  * VIEW: Tabela
  *
- * Componente de tabela reutilizável.
+ * Componente de tabela reutilizável com ordenação por colunas.
  */
 
 import React from 'react';
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
-const Tabela = ({ colunas, dados, onRowClick, className = '' }) => {
+const Tabela = ({ colunas, dados, onRowClick, className = '', ordenacao, onOrdenacaoChange }) => {
+
+  const handleSort = (accessor) => {
+    if (!onOrdenacaoChange) return;
+    if (ordenacao?.campo === accessor) {
+      if (ordenacao.direcao === 'asc') {
+        onOrdenacaoChange({ campo: accessor, direcao: 'desc' });
+      } else if (ordenacao.direcao === 'desc') {
+        onOrdenacaoChange({ campo: null, direcao: null });
+      }
+    } else {
+      onOrdenacaoChange({ campo: accessor, direcao: 'asc' });
+    }
+  };
+
+  const renderSortIcon = (accessor) => {
+    if (!onOrdenacaoChange) return null;
+    if (ordenacao?.campo === accessor) {
+      if (ordenacao.direcao === 'asc') {
+        return <ChevronUp size={14} className="text-primary-600" />;
+      }
+      return <ChevronDown size={14} className="text-primary-600" />;
+    }
+    return <ChevronsUpDown size={14} className="text-gray-300" />;
+  };
+
   return (
     <div className={`overflow-x-auto ${className}`}>
       <table className="w-full">
@@ -15,9 +41,15 @@ const Tabela = ({ colunas, dados, onRowClick, className = '' }) => {
             {colunas.map((coluna, index) => (
               <th
                 key={index}
-                className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 ${coluna.className || ''}`}
+                className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 ${
+                  onOrdenacaoChange && coluna.sortable !== false ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''
+                } ${coluna.className || ''}`}
+                onClick={() => coluna.sortable !== false && handleSort(coluna.accessor)}
               >
-                {coluna.header}
+                <div className="flex items-center gap-1">
+                  {coluna.header}
+                  {coluna.sortable !== false && renderSortIcon(coluna.accessor)}
+                </div>
               </th>
             ))}
           </tr>
