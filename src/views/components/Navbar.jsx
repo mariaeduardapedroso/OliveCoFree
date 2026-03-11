@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   User,
-  Leaf
+  Leaf,
+  FlaskConical
 } from 'lucide-react';
 import { logout, getUsuarioAtual } from '../../models/UsuarioModel';
 
@@ -26,8 +27,11 @@ const Navbar = () => {
 
   const links = [
     { path: '/app/dashboard', label: 'Dashboard', icone: <LayoutDashboard size={20} /> },
-    { path: '/app/previsao', label: 'Previsão', icone: <TrendingUp size={20} /> },
-    { path: '/app/historico', label: 'Histórico', icone: <History size={20} /> }
+    { path: '/app/previsao', label: 'Previsao', icone: <TrendingUp size={20} /> },
+    { path: '/app/historico', label: 'Historico', icone: <History size={20} /> },
+    ...(usuario?.tipo === 'pesquisador' ? [
+      { path: '/app/painel-cientifico', label: 'Painel Cientifico', icone: <FlaskConical size={20} /> }
+    ] : []),
   ];
 
   const handleLogout = () => {

@@ -8,7 +8,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Páginas
-import { Login, Cadastro, Dashboard, Previsao, Historico, EsqueciSenha, Perfil, LandingPage, TermosUso, PoliticaPrivacidade, RedefinirSenha, NaoEncontrada } from './pages';
+import { Login, Cadastro, Dashboard, Previsao, Historico, EsqueciSenha, Perfil, LandingPage, TermosUso, PoliticaPrivacidade, RedefinirSenha, NaoEncontrada, PainelCientifico } from './pages';
 
 // Componentes
 import Layout from './components/Layout';
@@ -48,6 +48,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="previsao" element={<Previsao />} />
           <Route path="historico" element={<Historico />} />
+          <Route path="painel-cientifico" element={<PainelCientifico />} />
           <Route path="perfil" element={<Perfil />} />
         </Route>
 

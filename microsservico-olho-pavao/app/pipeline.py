@@ -132,6 +132,110 @@ def preparar_dataset_treino() -> pd.DataFrame:
 
 
 # ============================================================
+# PIPELINE DE RETREINO (dados novos do pesquisador + GitHub)
+# ============================================================
+
+def preparar_dataset_com_novos_dados(df_doenca_novo: pd.DataFrame, df_clima_novo: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combina dados originais do GitHub com novos dados enviados pelo pesquisador.
+    Retorna dataset pronto para treino.
+    """
+    print("[Pipeline] Retreino: combinando dados GitHub + novos dados do pesquisador...")
+
+    # --- Carregar dados originais do GitHub ---
+    frames = []
+    for url in URLS_DOENCA:
+        print(f"[Pipeline] Carregando original: {url.split('/')[-1]}")
+        df = pd.read_excel(url, header=1)
+        df.columns = df.columns.astype(str).str.strip()
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        frames.append(df)
+
+    df_pavao_original = pd.concat(frames, ignore_index=True)
+
+    # Normalizar nomes das colunas originais
+    df_pavao_original.columns = [
+        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
+        for c in df_pavao_original.columns
+    ]
+
+    # Normalizar nomes das colunas novas
+    df_doenca_novo.columns = [
+        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
+        for c in df_doenca_novo.columns
+    ]
+
+    # Concatenar doença
+    df_pavao = pd.concat([df_pavao_original, df_doenca_novo], ignore_index=True)
+    df_pavao = df_pavao.rename(columns={
+        'visiveis + latentes': 'visiveis_latentes',
+    })
+    df_pavao['data'] = pd.to_datetime(df_pavao['data'])
+    df_pavao['visiveis_latentes'] = pd.to_numeric(
+        df_pavao['visiveis_latentes'], errors='coerce'
+    ).fillna(0)
+    df_pavao['semana_do_ano'] = df_pavao['data'].dt.isocalendar().week.astype(int)
+    df_pavao['ano'] = df_pavao['data'].dt.year
+    df_pavao['folha_infectada'] = (df_pavao['visiveis_latentes'] > 0).astype(int)
+
+    # Agregar doença por semana
+    df_doenca_sem = df_pavao.groupby(['ano', 'semana_do_ano']).agg(
+        total_folhas=('folha', 'count'),
+        folhas_infectadas=('folha_infectada', 'sum'),
+    ).reset_index()
+    df_doenca_sem['perc_infectadas'] = (
+        df_doenca_sem['folhas_infectadas'] / df_doenca_sem['total_folhas'] * 100
+    ).round(2)
+    df_doenca_sem['infectado'] = (
+        df_doenca_sem['perc_infectadas'] >= PERCENTAGEM_INFECTADO
+    ).astype(int)
+
+    # --- Clima: GitHub + novos ---
+    print(f"[Pipeline] Carregando clima original do GitHub...")
+    df_clima_original = pd.read_excel(URL_CLIMA, sheet_name=SHEET_CLIMA)
+    df_clima_original = df_clima_original.drop('ESTACAO', axis=1, errors='ignore')
+
+    # Normalizar colunas do clima novo para uppercase (padrão esperado)
+    df_clima_novo.columns = [str(c).strip().upper() for c in df_clima_novo.columns]
+
+    df_clima = pd.concat([df_clima_original, df_clima_novo], ignore_index=True)
+    df_clima['data'] = pd.to_datetime({
+        'year': df_clima['ANO'], 'month': df_clima['MES'], 'day': df_clima['DIA']
+    })
+    df_clima = df_clima.rename(columns={
+        'ANO': 'ano', 'T_MED': 'temp_media', 'T_MAX': 'temp_max',
+        'T_MIN': 'temp_min', 'HR_MED': 'humidade', 'FF_MED': 'vento',
+        'PR_QTD': 'precipitacao',
+    })
+    df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
+
+    for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
+        if col in df_clima.columns:
+            df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
+
+    # Features epidemiologicas diárias
+    df_clima['fator_temp'] = _calcular_fator_temp(df_clima['temp_media'])
+    df_clima['fator_humidade'] = _calcular_fator_humidade(df_clima['humidade'])
+    df_clima['indice_favorabilidade'] = df_clima['fator_temp'] * df_clima['fator_humidade']
+
+    # Agregar clima por semana
+    df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
+        temp_media_semana=('temp_media', 'mean'),
+        humidade_semana=('humidade', 'mean'),
+        precipitacao_semana=('precipitacao', 'mean'),
+        vento_semana=('vento', 'mean'),
+        indice_favorabilidade_semana=('indice_favorabilidade', 'mean'),
+    ).reset_index()
+
+    # Merge
+    df_final = pd.merge(df_doenca_sem, df_clima_sem, on=['ano', 'semana_do_ano'], how='inner')
+    df_final = df_final.dropna()
+
+    print(f"[Pipeline] Dataset retreino: {len(df_final)} registos (antes + novos)")
+    return df_final
+
+
+# ============================================================
 # CALCULAR FEATURES DO INPUT DO UTILIZADOR
 # ============================================================
 

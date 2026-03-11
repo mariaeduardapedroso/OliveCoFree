@@ -16,3 +16,4 @@ export { default as TermosUso } from './TermosUso';
 export { default as PoliticaPrivacidade } from './PoliticaPrivacidade';
 export { default as RedefinirSenha } from './RedefinirSenha';
 export { default as NaoEncontrada } from './NaoEncontrada';
+export { default as PainelCientifico } from './PainelCientifico';

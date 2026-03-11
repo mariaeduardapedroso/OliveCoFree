@@ -154,6 +154,77 @@ export const buscarSemanaAtual = async () => {
   return response.data;
 };
 
+// ==================== PESQUISADOR ====================
+
+/**
+ * Funcao auxiliar para uploads com FormData (multipart).
+ * Nao define Content-Type para o browser preencher o boundary.
+ */
+const fetchAPIUpload = async (endpoint, formData) => {
+  const token = getToken();
+  const headers = {};
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    window.location.href = '/login';
+    throw new Error('Sessao expirada');
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const message = errorData?.detail || `Erro HTTP: ${response.status}`;
+    throw typeof message === 'string' ? new Error(message) : { detail: message };
+  }
+
+  return await response.json();
+};
+
+export const apiObterInfoModelos = async () => {
+  return await fetchAPI('/pesquisador/modelo/info');
+};
+
+export const apiDownloadTemplate = async (tipo) => {
+  const token = getToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/pesquisador/templates/${tipo}`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.detail || `Erro ao baixar template`);
+  }
+
+  return await response.blob();
+};
+
+export const apiUploadDados = async (doencaId, arquivoDoenca, arquivoClima) => {
+  const formData = new FormData();
+  formData.append('doenca_id', doencaId);
+  formData.append('arquivo_doenca', arquivoDoenca);
+  formData.append('arquivo_clima', arquivoClima);
+  return await fetchAPIUpload('/pesquisador/upload', formData);
+};
+
+export const apiListarUploads = async () => {
+  return await fetchAPI('/pesquisador/uploads');
+};
+
 // ==================== HEALTH ====================
 
 export const verificarBackend = async () => {
@@ -185,5 +256,9 @@ export default {
   buscarClimaHoje,
   buscarClimaSemana,
   buscarSemanaAtual,
-  verificarBackend
+  verificarBackend,
+  apiObterInfoModelos,
+  apiDownloadTemplate,
+  apiUploadDados,
+  apiListarUploads
 };

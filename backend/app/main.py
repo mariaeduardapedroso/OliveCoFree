@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from .config import CORS_ORIGINS, API_HOST, API_PORT
 from .database import engine, Base, SessionLocal
-from .routes import clima_router, auth_router, previsao_router
+from .routes import clima_router, auth_router, previsao_router, pesquisador_router
 
 
 @asynccontextmanager
@@ -118,6 +118,7 @@ app.add_middleware(
 app.include_router(clima_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(previsao_router, prefix="/api")
+app.include_router(pesquisador_router, prefix="/api")
 
 
 @app.get("/")

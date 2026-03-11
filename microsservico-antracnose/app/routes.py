@@ -1,9 +1,10 @@
 """
 Rotas da API - Microsservico Antracnose
 """
+import pandas as pd
 from fastapi import APIRouter, HTTPException, status
-from .schemas import PrevisaoRequest, PrevisaoResponse, ModeloInfo, HealthResponse
-from .pipeline import calcular_features_do_input
+from .schemas import PrevisaoRequest, PrevisaoResponse, ModeloInfo, HealthResponse, RetreinoRequest
+from .pipeline import calcular_features_do_input, preparar_dataset_com_novos_dados
 from .config import FEATURES_MODELO, THRESHOLD_MEDIO, THRESHOLD_ALTO
 
 router = APIRouter()
@@ -62,6 +63,47 @@ async def fazer_previsao(request: PrevisaoRequest):
         semana=request.semana,
         ano=request.ano,
         **resultado,
+    )
+
+
+@router.post("/modelo/retreinar", response_model=ModeloInfo, tags=["Modelo"])
+async def retreinar_modelo(request: RetreinoRequest):
+    """
+    Retreina o modelo com novos dados enviados pelo pesquisador.
+    Combina os dados novos com os dados originais do GitHub.
+    """
+    if not modelo:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Modelo nao inicializado."
+        )
+
+    try:
+        df_doenca = pd.DataFrame(request.dados_doenca)
+        df_clima = pd.DataFrame(request.dados_clima)
+
+        # Combinar dados novos com GitHub e retreinar
+        df_treino = preparar_dataset_com_novos_dados(df_doenca, df_clima)
+        modelo.treinar(df_treino)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Erro ao retreinar modelo: {str(e)}"
+        )
+
+    return ModeloInfo(
+        modelo=modelo.metricas.get('modelo', ''),
+        accuracy=modelo.metricas.get('accuracy', 0),
+        f1_score=modelo.metricas.get('f1_score', 0),
+        total_amostras_treino=modelo.dataset_info.get('total_amostras', 0),
+        anos_treino=modelo.dataset_info.get('anos', []),
+        features_utilizadas=modelo.features_utilizadas,
+        thresholds={
+            'baixo': f'< {THRESHOLD_MEDIO}%',
+            'medio': f'{THRESHOLD_MEDIO}% - {THRESHOLD_ALTO}%',
+            'alto': f'>= {THRESHOLD_ALTO}%',
+        },
     )
 
 

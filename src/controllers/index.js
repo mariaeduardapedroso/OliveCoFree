@@ -11,3 +11,4 @@ export * from './ClimaController';
 export { default as AuthController } from './AuthController';
 export { default as PrevisaoController } from './PrevisaoController';
 export { default as ClimaController } from './ClimaController';
+export { default as PesquisadorController } from './PesquisadorController';

@@ -58,6 +58,12 @@ class ModeloInfo(BaseModel):
     thresholds: dict
 
 
+class RetreinoRequest(BaseModel):
+    """Dados enviados pelo pesquisador para retreino do modelo."""
+    dados_doenca: List[dict] = Field(..., description="Registos de doença (lista de dicts)")
+    dados_clima: List[dict] = Field(..., description="Registos climáticos (lista de dicts)")
+
+
 class HealthResponse(BaseModel):
     """Resposta do health check."""
     status: str

@@ -145,6 +145,122 @@ def preparar_dataset_treino() -> pd.DataFrame:
 
 
 # ============================================================
+# PIPELINE DE RETREINO (dados novos do pesquisador + GitHub)
+# ============================================================
+
+def preparar_dataset_com_novos_dados(df_doenca_novo: pd.DataFrame, df_clima_novo: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combina dados originais do GitHub com novos dados enviados pelo pesquisador.
+    Retorna dataset pronto para treino.
+    """
+    print("[Pipeline] Retreino: combinando dados GitHub + novos dados do pesquisador...")
+
+    # --- Carregar dados originais do GitHub ---
+    frames = []
+    for url, sheet in zip(URLS_DOENCA, SHEETS_DOENCA):
+        print(f"[Pipeline] Carregando original: {sheet}")
+        df = pd.read_excel(url, sheet_name=sheet, header=1)
+        df.columns = df.columns.astype(str).str.strip()
+        frames.append(df)
+
+    df_antracnose_original = pd.concat(frames, ignore_index=True)
+
+    # Normalizar nomes das colunas originais
+    df_antracnose_original.columns = [
+        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
+        for c in df_antracnose_original.columns
+    ]
+
+    # Normalizar nomes das colunas novas
+    df_doenca_novo.columns = [
+        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
+        for c in df_doenca_novo.columns
+    ]
+
+    # Concatenar doença
+    df_antracnose = pd.concat([df_antracnose_original, df_doenca_novo], ignore_index=True)
+    df_antracnose = df_antracnose.rename(columns={
+        'olival/parcela': 'parcela',
+    })
+    df_antracnose['data'] = pd.to_datetime(df_antracnose['data'])
+    df_antracnose['semana_do_ano'] = df_antracnose['data'].dt.isocalendar().week.astype(int)
+    df_antracnose['ano'] = df_antracnose['data'].dt.year
+
+    # Agregar por data, parcela, arvore
+    df_agg = (
+        df_antracnose
+        .groupby(['data', 'parcela', 'arvore', 'semana_do_ano', 'ano'])
+        .agg(
+            total_azeitonas=('incidencia', 'count'),
+            azeitonas_infectadas=('incidencia', 'sum'),
+            severidade_media=('severidade', 'mean'),
+        )
+        .reset_index()
+    )
+    df_agg['perc_infectadas'] = (
+        df_agg['azeitonas_infectadas'] / df_agg['total_azeitonas'] * 100
+    ).round(2)
+    df_agg['infectado'] = (df_agg['perc_infectadas'] >= PERCENTAGEM_INFECTADO).astype(int)
+
+    # Agregar ao nível semanal
+    df_doenca_sem = df_agg.groupby(['ano', 'semana_do_ano']).agg(
+        total_azeitonas=('total_azeitonas', 'sum'),
+        azeitonas_infectadas=('azeitonas_infectadas', 'sum'),
+        severidade_media=('severidade_media', 'mean'),
+    ).reset_index()
+    df_doenca_sem['perc_infectadas'] = (
+        df_doenca_sem['azeitonas_infectadas'] / df_doenca_sem['total_azeitonas'] * 100
+    ).round(2)
+    df_doenca_sem['infectado'] = (
+        df_doenca_sem['perc_infectadas'] >= PERCENTAGEM_INFECTADO
+    ).astype(int)
+
+    # --- Clima: GitHub + novos ---
+    print(f"[Pipeline] Carregando clima original do GitHub...")
+    df_clima_original = pd.read_excel(URL_CLIMA, sheet_name=SHEET_CLIMA)
+    df_clima_original = df_clima_original.drop('ESTACAO', axis=1, errors='ignore')
+
+    # Normalizar colunas do clima novo para uppercase
+    df_clima_novo.columns = [str(c).strip().upper() for c in df_clima_novo.columns]
+
+    df_clima = pd.concat([df_clima_original, df_clima_novo], ignore_index=True)
+    df_clima['data'] = pd.to_datetime({
+        'year': df_clima['ANO'], 'month': df_clima['MES'], 'day': df_clima['DIA']
+    })
+    df_clima = df_clima.rename(columns={
+        'ANO': 'ano', 'T_MED': 'temp_media', 'T_MAX': 'temp_max',
+        'T_MIN': 'temp_min', 'HR_MED': 'humidade', 'FF_MED': 'vento',
+        'PR_QTD': 'precipitacao',
+    })
+    df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
+
+    for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
+        if col in df_clima.columns:
+            df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
+
+    # Features epidemiológicas diárias
+    df_clima['fator_temp'] = _calcular_fator_temp(df_clima['temp_media'])
+    df_clima['fator_humidade'] = _calcular_fator_humidade(df_clima['humidade'])
+    df_clima['indice_favorabilidade'] = df_clima['fator_temp'] * df_clima['fator_humidade']
+
+    # Agregar clima por semana
+    df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
+        temp_media_semana=('temp_media', 'mean'),
+        humidade_semana=('humidade', 'mean'),
+        precipitacao_semana=('precipitacao', 'mean'),
+        vento_semana=('vento', 'mean'),
+        indice_favorabilidade_semana=('indice_favorabilidade', 'mean'),
+    ).reset_index()
+
+    # Merge
+    df_final = pd.merge(df_doenca_sem, df_clima_sem, on=['ano', 'semana_do_ano'], how='inner')
+    df_final = df_final.dropna()
+
+    print(f"[Pipeline] Dataset retreino: {len(df_final)} registos (antes + novos)")
+    return df_final
+
+
+# ============================================================
 # CALCULAR FEATURES DO INPUT DO UTILIZADOR
 # ============================================================
 
