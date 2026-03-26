@@ -231,7 +231,10 @@ export const apiListarUploads = async (pagina = 1, tamanho = 10) => {
 
 export const verificarBackend = async () => {
   try {
-    const response = await fetch('http://localhost:8001/health', {
+    const healthUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:8001/health'
+      : '/health';
+    const response = await fetch(healthUrl, {
       method: 'GET',
       signal: AbortSignal.timeout(3000)
     });
