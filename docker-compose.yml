@@ -36,7 +36,7 @@ services:
       - olivecofree-net
     restart: unless-stopped
 
-  # ── Backend (FastAPI) ─────────────────────────────────────
+  # ── Backend (FastAPI) — inicia primeiro, cria tabelas ─────
   backend:
     build:
       context: ./backend
@@ -54,13 +54,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      microsservico-olho-pavao:
-        condition: service_healthy
-      microsservico-antracnose:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 5
       start_period: 30s
@@ -68,7 +64,7 @@ services:
       - olivecofree-net
     restart: unless-stopped
 
-  # ── Microsserviço Olho de Pavão ───────────────────────────
+  # ── Microsserviço Olho de Pavão — depende do backend ─────
   microsservico-olho-pavao:
     build:
       context: ./microsservico-olho-pavao
@@ -77,19 +73,19 @@ services:
     environment:
       - DATABASE_URL=postgresql://olivecofree:olivecofree2024@db:5432/olivecofree
     depends_on:
-      db:
+      backend:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
     networks:
       - olivecofree-net
     restart: unless-stopped
 
-  # ── Microsserviço Antracnose ──────────────────────────────
+  # ── Microsserviço Antracnose — depende do backend ────────
   microsservico-antracnose:
     build:
       context: ./microsservico-antracnose
@@ -98,14 +94,14 @@ services:
     environment:
       - DATABASE_URL=postgresql://olivecofree:olivecofree2024@db:5432/olivecofree
     depends_on:
-      db:
+      backend:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
     networks:
       - olivecofree-net
     restart: unless-stopped
