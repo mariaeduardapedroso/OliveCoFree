@@ -2,36 +2,20 @@
 Pipeline de Dados - Microsservico Olho de Pavao
 
 Duas responsabilidades:
-  1. TREINO: Dados do GitHub -> features semanais -> dataset para treinar o modelo
+  1. TREINO: Dados do PostgreSQL -> features semanais -> dataset para treinar o modelo
   2. PREVISAO: Dados climaticos do utilizador -> mesmas features -> previsao
 
-Dados carregados diretamente do repositorio GitHub (sem ficheiros locais).
+Dados carregados diretamente do banco de dados PostgreSQL.
 """
-import unicodedata
 import pandas as pd
 import numpy as np
+from typing import List, Optional
+from sqlalchemy import create_engine
 from .config import (
-    URLS_DOENCA,
-    URL_CLIMA,
-    SHEET_CLIMA,
+    DATABASE_URL,
     PERCENTAGEM_INFECTADO,
+    CANDIDATE_FEATURES,
 )
-
-
-def _calcular_fator_temp(temp_media):
-    """Fator de temperatura (otimo 15-20C para Spilocaea oleaginea)."""
-    return np.where(
-        (temp_media >= 15) & (temp_media <= 20), 1.0,
-        np.where((temp_media >= 10) & (temp_media < 15), 0.7,
-        np.where((temp_media > 20) & (temp_media <= 25), 0.5, 0.2)))
-
-
-def _calcular_fator_humidade(humidade):
-    """Fator de humidade (favoravel >= 80%)."""
-    return np.where(
-        humidade >= 80, 1.0,
-        np.where(humidade >= 70, 0.7,
-        np.where(humidade >= 60, 0.4, 0.1)))
 
 
 # ============================================================
@@ -39,34 +23,21 @@ def _calcular_fator_humidade(humidade):
 # ============================================================
 
 def preparar_dataset_treino() -> pd.DataFrame:
-    """Pipeline completo: dados GitHub -> features semanais -> dataset."""
+    """Pipeline completo: dados PostgreSQL -> features semanais -> dataset."""
     print("=" * 60)
-    print("[Pipeline] Preparando dataset de treino (dados do GitHub)...")
+    print("[Pipeline] Preparando dataset de treino (dados do PostgreSQL)...")
     print("=" * 60)
 
-    # --- Dados de doenca (do GitHub) ---
-    frames = []
-    for url in URLS_DOENCA:
-        print(f"[Pipeline] Carregando: {url.split('/')[-1]}")
-        df = pd.read_excel(url, header=1)
-        df.columns = df.columns.astype(str).str.strip()
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-        frames.append(df)
+    engine = create_engine(DATABASE_URL)
 
-    df_pavao = pd.concat(frames, ignore_index=True)
-    # Normalizar nomes: remover espacos, acentos e lowercase
-    df_pavao.columns = [
-        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
-        for c in df_pavao.columns
-    ]
-    df_pavao = df_pavao.rename(columns={
-        'data': 'data',
-        'repeticao': 'repeticao',
-        'arvore': 'arvore',
-        'folha': 'folha',
-        'visiveis': 'visiveis',
-        'visiveis + latentes': 'visiveis_latentes',
-    })
+    # --- Dados de doenca (do banco) ---
+    df_pavao = pd.read_sql("SELECT * FROM dados_olho_pavao", engine)
+    print(f"[Pipeline] Doenca: {len(df_pavao)} registos")
+
+    if len(df_pavao) == 0:
+        print("[Pipeline] AVISO: Tabela dados_olho_pavao vazia!")
+        return pd.DataFrame()
+
     df_pavao['data'] = pd.to_datetime(df_pavao['data'])
     df_pavao['visiveis_latentes'] = pd.to_numeric(
         df_pavao['visiveis_latentes'], errors='coerce'
@@ -74,7 +45,6 @@ def preparar_dataset_treino() -> pd.DataFrame:
     df_pavao['semana_do_ano'] = df_pavao['data'].dt.isocalendar().week.astype(int)
     df_pavao['ano'] = df_pavao['data'].dt.year
     df_pavao['folha_infectada'] = (df_pavao['visiveis_latentes'] > 0).astype(int)
-    print(f"[Pipeline] Doenca: {len(df_pavao)} registos")
 
     # Agregar doenca por semana
     df_doenca_sem = df_pavao.groupby(['ano', 'semana_do_ano']).agg(
@@ -88,151 +58,83 @@ def preparar_dataset_treino() -> pd.DataFrame:
         df_doenca_sem['perc_infectadas'] >= PERCENTAGEM_INFECTADO
     ).astype(int)
 
-    # --- Dados climaticos (do GitHub) ---
-    print(f"[Pipeline] Carregando clima do GitHub...")
-    df_clima = pd.read_excel(URL_CLIMA, sheet_name=SHEET_CLIMA)
-    df_clima = df_clima.drop('ESTACAO', axis=1, errors='ignore')
-    df_clima['data'] = pd.to_datetime({
-        'year': df_clima['ANO'], 'month': df_clima['MES'], 'day': df_clima['DIA']
-    })
+    # --- Dados climaticos (do banco) ---
+    df_clima = pd.read_sql("SELECT * FROM dados_clima", engine)
+    print(f"[Pipeline] Clima: {len(df_clima)} registos")
+
+    if len(df_clima) == 0:
+        print("[Pipeline] AVISO: Tabela dados_clima vazia!")
+        return pd.DataFrame()
+
     df_clima = df_clima.rename(columns={
-        'ANO': 'ano', 'T_MED': 'temp_media', 'T_MAX': 'temp_max',
-        'T_MIN': 'temp_min', 'HR_MED': 'humidade', 'FF_MED': 'vento',
-        'PR_QTD': 'precipitacao',
+        'ano': 'ano', 't_med': 'temp_media', 't_max': 'temp_max',
+        't_min': 'temp_min', 'hr_med': 'humidade', 'ff_med': 'vento',
+        'pr_qtd': 'precipitacao',
+    })
+    df_clima['data'] = pd.to_datetime({
+        'year': df_clima['ano'], 'month': df_clima['mes'], 'day': df_clima['dia']
     })
     df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
 
     for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
         if col in df_clima.columns:
             df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
-    print(f"[Pipeline] Clima: {len(df_clima)} registos")
 
-    # Features epidemiologicas diarias
-    df_clima['fator_temp'] = _calcular_fator_temp(df_clima['temp_media'])
-    df_clima['fator_humidade'] = _calcular_fator_humidade(df_clima['humidade'])
-    df_clima['indice_favorabilidade'] = df_clima['fator_temp'] * df_clima['fator_humidade']
-
-    # Agregar clima por semana (medias semanais)
+    # Agregar clima por semana (medias semanais + novas features)
     df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
         temp_media_semana=('temp_media', 'mean'),
+        temp_max_semana=('temp_max', 'max'),
+        temp_min_semana=('temp_min', 'min'),
         humidade_semana=('humidade', 'mean'),
         precipitacao_semana=('precipitacao', 'mean'),
         vento_semana=('vento', 'mean'),
-        indice_favorabilidade_semana=('indice_favorabilidade', 'mean'),
+        dias_chuva_semana=('precipitacao', lambda x: (x > 0.1).sum()),
     ).reset_index()
+
+    # Amplitude termica
+    df_clima_sem['amplitude_termica'] = df_clima_sem['temp_max_semana'] - df_clima_sem['temp_min_semana']
+
+    # Ordenar cronologicamente para features temporais
+    df_clima_sem = df_clima_sem.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
+
+    # Features com lag temporal
+    df_clima_sem['precipitacao_acumulada_2sem'] = (
+        df_clima_sem['precipitacao_semana'].rolling(2, min_periods=1).sum()
+    )
+    df_clima_sem['temp_media_2sem_anterior'] = df_clima_sem['temp_media_semana'].shift(1).fillna(0)
+    df_clima_sem['humidade_2sem_anterior'] = df_clima_sem['humidade_semana'].shift(1).fillna(0)
 
     # Merge
     df_final = pd.merge(df_doenca_sem, df_clima_sem, on=['ano', 'semana_do_ano'], how='inner')
-    df_final = df_final.dropna()
+    df_final = df_final.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
+    df_final = df_final.fillna(0)
 
     print(f"\n[Pipeline] Dataset treino: {len(df_final)} registos")
     print(f"  Infectado: {df_final['infectado'].value_counts().to_dict()}")
+    print(f"  Features candidatas: {len(CANDIDATE_FEATURES)}")
     print("=" * 60)
+
+    engine.dispose()
     return df_final
 
 
 # ============================================================
-# PIPELINE DE RETREINO (dados novos do pesquisador + GitHub)
+# JANELA DE EXPANSAO
 # ============================================================
 
-def preparar_dataset_com_novos_dados(df_doenca_novo: pd.DataFrame, df_clima_novo: pd.DataFrame) -> pd.DataFrame:
+def gerar_janelas_expansivas(df: pd.DataFrame, min_window: int = 5):
     """
-    Combina dados originais do GitHub com novos dados enviados pelo pesquisador.
-    Retorna dataset pronto para treino.
+    Gera janelas de expansao para treino incremental.
+
+    Cada janela inclui TODOS os dados ate a semana W.
+    Retorna tuplas (df_treino, df_teste_1_linha).
     """
-    print("[Pipeline] Retreino: combinando dados GitHub + novos dados do pesquisador...")
+    df = df.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
 
-    # --- Carregar dados originais do GitHub ---
-    frames = []
-    for url in URLS_DOENCA:
-        print(f"[Pipeline] Carregando original: {url.split('/')[-1]}")
-        df = pd.read_excel(url, header=1)
-        df.columns = df.columns.astype(str).str.strip()
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-        frames.append(df)
-
-    df_pavao_original = pd.concat(frames, ignore_index=True)
-
-    # Normalizar nomes das colunas originais
-    df_pavao_original.columns = [
-        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
-        for c in df_pavao_original.columns
-    ]
-
-    # Normalizar nomes das colunas novas
-    df_doenca_novo.columns = [
-        unicodedata.normalize('NFKD', str(c)).encode('ascii', 'ignore').decode().strip().lower()
-        for c in df_doenca_novo.columns
-    ]
-
-    # Concatenar doença
-    df_pavao = pd.concat([df_pavao_original, df_doenca_novo], ignore_index=True)
-    df_pavao = df_pavao.rename(columns={
-        'visiveis + latentes': 'visiveis_latentes',
-    })
-    df_pavao['data'] = pd.to_datetime(df_pavao['data'])
-    df_pavao['visiveis_latentes'] = pd.to_numeric(
-        df_pavao['visiveis_latentes'], errors='coerce'
-    ).fillna(0)
-    df_pavao['semana_do_ano'] = df_pavao['data'].dt.isocalendar().week.astype(int)
-    df_pavao['ano'] = df_pavao['data'].dt.year
-    df_pavao['folha_infectada'] = (df_pavao['visiveis_latentes'] > 0).astype(int)
-
-    # Agregar doença por semana
-    df_doenca_sem = df_pavao.groupby(['ano', 'semana_do_ano']).agg(
-        total_folhas=('folha', 'count'),
-        folhas_infectadas=('folha_infectada', 'sum'),
-    ).reset_index()
-    df_doenca_sem['perc_infectadas'] = (
-        df_doenca_sem['folhas_infectadas'] / df_doenca_sem['total_folhas'] * 100
-    ).round(2)
-    df_doenca_sem['infectado'] = (
-        df_doenca_sem['perc_infectadas'] >= PERCENTAGEM_INFECTADO
-    ).astype(int)
-
-    # --- Clima: GitHub + novos ---
-    print(f"[Pipeline] Carregando clima original do GitHub...")
-    df_clima_original = pd.read_excel(URL_CLIMA, sheet_name=SHEET_CLIMA)
-    df_clima_original = df_clima_original.drop('ESTACAO', axis=1, errors='ignore')
-
-    # Normalizar colunas do clima novo para uppercase (padrão esperado)
-    df_clima_novo.columns = [str(c).strip().upper() for c in df_clima_novo.columns]
-
-    df_clima = pd.concat([df_clima_original, df_clima_novo], ignore_index=True)
-    df_clima['data'] = pd.to_datetime({
-        'year': df_clima['ANO'], 'month': df_clima['MES'], 'day': df_clima['DIA']
-    })
-    df_clima = df_clima.rename(columns={
-        'ANO': 'ano', 'T_MED': 'temp_media', 'T_MAX': 'temp_max',
-        'T_MIN': 'temp_min', 'HR_MED': 'humidade', 'FF_MED': 'vento',
-        'PR_QTD': 'precipitacao',
-    })
-    df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
-
-    for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
-        if col in df_clima.columns:
-            df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
-
-    # Features epidemiologicas diárias
-    df_clima['fator_temp'] = _calcular_fator_temp(df_clima['temp_media'])
-    df_clima['fator_humidade'] = _calcular_fator_humidade(df_clima['humidade'])
-    df_clima['indice_favorabilidade'] = df_clima['fator_temp'] * df_clima['fator_humidade']
-
-    # Agregar clima por semana
-    df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
-        temp_media_semana=('temp_media', 'mean'),
-        humidade_semana=('humidade', 'mean'),
-        precipitacao_semana=('precipitacao', 'mean'),
-        vento_semana=('vento', 'mean'),
-        indice_favorabilidade_semana=('indice_favorabilidade', 'mean'),
-    ).reset_index()
-
-    # Merge
-    df_final = pd.merge(df_doenca_sem, df_clima_sem, on=['ano', 'semana_do_ano'], how='inner')
-    df_final = df_final.dropna()
-
-    print(f"[Pipeline] Dataset retreino: {len(df_final)} registos (antes + novos)")
-    return df_final
+    for i in range(min_window, len(df)):
+        train = df.iloc[:i]
+        test = df.iloc[i:i+1]
+        yield train, test
 
 
 # ============================================================
@@ -247,38 +149,29 @@ def calcular_features_do_input(
     humidade: float,
     precipitacao: float,
     velocidade_vento: float = 0.0,
+    features_selecionadas: Optional[List[str]] = None,
 ) -> pd.Series:
     """
-    Calcula as mesmas 6 features usadas no treino a partir dos dados
+    Calcula as features usadas no treino a partir dos dados
     climaticos enviados pelo utilizador.
     """
-    # Fator de temperatura
-    if 15 <= temperatura_media <= 20:
-        fator_temp = 1.0
-    elif 10 <= temperatura_media < 15:
-        fator_temp = 0.7
-    elif 20 < temperatura_media <= 25:
-        fator_temp = 0.5
-    else:
-        fator_temp = 0.2
+    amplitude = temperatura_maxima - temperatura_minima
 
-    # Fator de humidade
-    if humidade >= 80:
-        fator_humidade = 1.0
-    elif humidade >= 70:
-        fator_humidade = 0.7
-    elif humidade >= 60:
-        fator_humidade = 0.4
-    else:
-        fator_humidade = 0.1
-
-    indice_favorabilidade = fator_temp * fator_humidade
-
-    return pd.Series({
+    all_features = {
         'semana_do_ano': float(semana),
         'temp_media_semana': temperatura_media,
+        'temp_max_semana': temperatura_maxima,
+        'temp_min_semana': temperatura_minima,
+        'amplitude_termica': amplitude,
         'humidade_semana': humidade,
         'precipitacao_semana': precipitacao,
+        'precipitacao_acumulada_2sem': precipitacao,
         'vento_semana': velocidade_vento,
-        'indice_favorabilidade_semana': indice_favorabilidade,
-    })
+        'temp_media_2sem_anterior': 0.0,
+        'humidade_2sem_anterior': 0.0,
+        'dias_chuva_semana': 1.0 if precipitacao > 0.1 else 0.0,
+    }
+
+    if features_selecionadas:
+        return pd.Series({k: all_features.get(k, 0.0) for k in features_selecionadas})
+    return pd.Series(all_features)

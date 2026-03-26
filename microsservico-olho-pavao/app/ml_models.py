@@ -1,34 +1,33 @@
 """
-Modelo ML - Microsserviço Olho de Pavão
+Modelo ML - Microsservico Olho de Pavao
 
-Abordagem híbrida: Logistic Regression + Índice de Favorabilidade Biológica
+Abordagem: Ensemble (RF + XGBoost + Ridge)
 
-Com apenas 29 amostras de treino, o modelo ML puro pode aprender padrões
-espúrios. A abordagem híbrida combina:
-  - Logistic Regression (padrões dos dados reais de campo)
-  - Índice de Favorabilidade Epidemiológica (conhecimento biológico)
-
-A previsão final pondera ambos os componentes, garantindo que condições
-biologicamente favoráveis (15-20°C, humidade ≥80%) produzem risco mais alto.
+Combina:
+  - Random Forest Regressor (padroes nao-lineares)
+  - XGBoost Regressor (interacoes complexas)
+  - Ridge Regression (estabilidade linear)
 """
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from xgboost import XGBRegressor
 
-from .config import FEATURES_MODELO, THRESHOLD_MEDIO, THRESHOLD_ALTO
-
-# Peso do componente biológico vs ML na previsão final
-PESO_BIOLOGICO = 0.65
-PESO_ML = 0.35
+from .config import CANDIDATE_FEATURES, FALLBACK_FEATURES, THRESHOLD_MEDIO, THRESHOLD_ALTO
+from .feature_selection import stepwise_forward_aic
+from .pipeline import gerar_janelas_expansivas
 
 
 class ModeloOlhoPavao:
-    """Modelo de previsão de Olho de Pavão (abordagem híbrida)."""
+    """Modelo de previsao de Olho de Pavao (Ensemble)."""
 
     def __init__(self):
-        self.modelo = None
+        self.modelos = {}
+        self.pesos = {'rf': 0.4, 'xgb': 0.4, 'ridge': 0.2}
         self.scaler = None
         self.metricas = {}
         self.pronto = False
@@ -36,56 +35,103 @@ class ModeloOlhoPavao:
         self.dataset_info = {}
 
     def treinar(self, df: pd.DataFrame):
-        """Treina o modelo com o dataset processado das planilhas."""
+        """Treina ensemble com selecao automatica de features e janela de expansao."""
         print("\n" + "=" * 60)
-        print("[Modelo] Treino: Logistic Regression + Índice Biológico")
+        print("[Modelo] Treino: Ensemble (RF + XGBoost + Ridge)")
         print("=" * 60)
 
-        # Selecionar features disponíveis
-        self.features_utilizadas = [f for f in FEATURES_MODELO if f in df.columns]
+        # --- Stepwise Feature Selection ---
+        available = [f for f in CANDIDATE_FEATURES if f in df.columns]
+        X_all = df[available].fillna(0)
+        y = df['perc_infectadas'].fillna(0)
+
+        try:
+            self.features_utilizadas = stepwise_forward_aic(X_all, y)
+        except Exception as e:
+            print(f"  [Stepwise] Falha ({e}). Usando features padrao.")
+            self.features_utilizadas = [f for f in FALLBACK_FEATURES if f in df.columns]
+
         X = df[self.features_utilizadas].fillna(0)
-        y = df['infectado']
 
-        print(f"  Features: {len(self.features_utilizadas)}")
+        print(f"\n  Features selecionadas: {len(self.features_utilizadas)}")
         print(f"  Amostras: {len(X)}")
-        print(f"  Distribuição: {dict(zip(*np.unique(y, return_counts=True)))}")
+        print(f"  Target: perc_infectadas (media={y.mean():.2f}%, std={y.std():.2f}%)")
 
-        # Normalizar features (StandardScaler)
+        # --- Scale features ---
         self.scaler = StandardScaler()
         X_scaled = self.scaler.fit_transform(X)
 
-        # Debug: mostrar ranges do scaler
-        print(f"\n  Scaler (média / desvio-padrão):")
-        for feat, mean, std in zip(self.features_utilizadas, self.scaler.mean_, self.scaler.scale_):
-            print(f"    {feat}: média={mean:.2f}, std={std:.2f}")
-
-        # Logistic Regression
-        self.modelo = LogisticRegression(
-            max_iter=1000,
-            C=0.5,
-            random_state=42
+        # --- Train Ensemble ---
+        self.modelos['rf'] = RandomForestRegressor(
+            n_estimators=100, max_depth=5, min_samples_leaf=3, random_state=42
         )
+        self.modelos['xgb'] = XGBRegressor(
+            n_estimators=50, max_depth=3, learning_rate=0.1,
+            min_child_weight=3, random_state=42, verbosity=0
+        )
+        self.modelos['ridge'] = Ridge(alpha=1.0)
 
-        # Cross-validation para métricas (com 29 amostras, melhor que split)
-        cv_acc = cross_val_score(self.modelo, X_scaled, y, cv=5, scoring='accuracy')
-        cv_f1 = cross_val_score(self.modelo, X_scaled, y, cv=5, scoring='f1')
+        for name, model in self.modelos.items():
+            model.fit(X_scaled, y)
+            print(f"  {name}: treinado")
 
-        # Treinar no dataset COMPLETO (29 amostras é muito pouco para separar)
-        self.modelo.fit(X_scaled, y)
+        # --- Cross-validation metrics ---
+        n_cv = min(5, len(X))
+        if n_cv >= 2:
+            cv_mae = cross_val_score(
+                self.modelos['rf'], X_scaled, y, cv=n_cv, scoring='neg_mean_absolute_error'
+            )
+            mae_mean = -cv_mae.mean()
+        else:
+            mae_mean = 0.0
 
-        # Log dos coeficientes e intercept
-        print(f"\n  Coeficientes do modelo:")
-        for feat, coef in zip(self.features_utilizadas, self.modelo.coef_[0]):
-            print(f"    {feat}: {coef:.4f}")
-        print(f"  Intercept: {self.modelo.intercept_[0]:.4f}")
-        print(f"\n  Pesos: Biológico={PESO_BIOLOGICO}, ML={PESO_ML}")
+        # --- Expanding Window Evaluation ---
+        ew_errors = []
+        min_window = max(len(self.features_utilizadas) + 2, 5)
+        for train_df, test_df in gerar_janelas_expansivas(df, min_window):
+            try:
+                X_tr = train_df[self.features_utilizadas].fillna(0)
+                y_tr = train_df['perc_infectadas'].fillna(0)
+                X_te = test_df[self.features_utilizadas].fillna(0)
+                y_te = test_df['perc_infectadas'].values[0]
+
+                scaler_tmp = StandardScaler()
+                X_tr_s = scaler_tmp.fit_transform(X_tr)
+                X_te_s = scaler_tmp.transform(X_te)
+
+                preds = []
+                for name, model_cls in [
+                    ('rf', RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_leaf=3, random_state=42)),
+                    ('xgb', XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.1, min_child_weight=3, random_state=42, verbosity=0)),
+                    ('ridge', Ridge(alpha=1.0)),
+                ]:
+                    model_cls.fit(X_tr_s, y_tr)
+                    pred = model_cls.predict(X_te_s)[0]
+                    preds.append(pred)
+
+                pred_ens = self.pesos['rf'] * preds[0] + self.pesos['xgb'] * preds[1] + self.pesos['ridge'] * preds[2]
+                ew_errors.append(abs(pred_ens - y_te))
+            except Exception:
+                continue
+
+        ew_mae = np.mean(ew_errors) if ew_errors else mae_mean
+
+        # --- Full dataset predictions for R2 ---
+        preds_full = self._prever_ensemble(X_scaled)
+        r2 = r2_score(y, preds_full) if len(y) > 1 else 0.0
+        rmse = np.sqrt(mean_squared_error(y, preds_full))
 
         self.metricas = {
-            'modelo': 'Logistic Regression + Índice Biológico',
-            'accuracy': round(float(cv_acc.mean()), 4),
-            'f1_score': round(float(cv_f1.mean()), 4),
+            'modelo': 'Ensemble (RF + XGBoost + Ridge)',
+            'mae': round(float(mae_mean), 4),
+            'rmse': round(float(rmse), 4),
+            'r2': round(float(r2), 4),
+            'mae_expanding_window': round(float(ew_mae), 4),
             'amostras_treino': int(len(X)),
             'amostras_teste': 0,
+            # Backward compat
+            'accuracy': round(float(max(0, 1 - mae_mean / 100)), 4),
+            'f1_score': round(float(max(0, r2)), 4),
         }
 
         self.dataset_info = {
@@ -94,64 +140,86 @@ class ModeloOlhoPavao:
         }
 
         self.pronto = True
-        print(f"\n  Cross-Val Acurácia: {cv_acc.mean():.3f} (±{cv_acc.std():.3f})")
-        print(f"  Cross-Val F1-Score: {cv_f1.mean():.3f} (±{cv_f1.std():.3f})")
+        print(f"\n  MAE (Cross-Val): {mae_mean:.2f}%")
+        print(f"  MAE (Expanding Window): {ew_mae:.2f}%")
+        print(f"  RMSE: {rmse:.2f}%")
+        print(f"  R2: {r2:.4f}")
         print("[Modelo] Pronto!")
         print("=" * 60)
 
+    def _prever_ensemble(self, X_scaled: np.ndarray) -> np.ndarray:
+        """Previsao ponderada do ensemble."""
+        pred_rf = np.clip(self.modelos['rf'].predict(X_scaled), 0, 100)
+        pred_xgb = np.clip(self.modelos['xgb'].predict(X_scaled), 0, 100)
+        pred_ridge = np.clip(self.modelos['ridge'].predict(X_scaled), 0, 100)
+        return (
+            self.pesos['rf'] * pred_rf +
+            self.pesos['xgb'] * pred_xgb +
+            self.pesos['ridge'] * pred_ridge
+        )
+
     def prever(self, features: pd.Series) -> dict:
         """
-        Faz previsão combinando ML com conhecimento biológico.
+        Faz previsao usando Ensemble ML.
 
         Retorna:
-          - percentual_infeccao: probabilidade de infeção significativa (%)
+          - percentual_infeccao: previsao de infecao (%)
           - classificacao: baixo / medio / alto
-          - confianca: certeza do modelo na previsão (%)
+          - confianca: certeza do modelo (%)
+          - intervalo_confianca: inferior / superior
         """
         if not self.pronto:
-            raise RuntimeError("Modelo não treinado.")
+            raise RuntimeError("Modelo nao treinado.")
 
-        # ---- Componente ML (Logistic Regression) ----
+        # ---- Previsao Ensemble ----
         X = np.array([[features.get(f, 0.0) for f in self.features_utilizadas]])
         X = np.nan_to_num(X, nan=0.0)
         X_scaled = self.scaler.transform(X)
 
-        probabilidades_ml = self.modelo.predict_proba(X_scaled)[0]
-        prob_ml = float(probabilidades_ml[1])  # 0-1
+        pred_rf = float(np.clip(self.modelos['rf'].predict(X_scaled)[0], 0, 100))
+        pred_xgb = float(np.clip(self.modelos['xgb'].predict(X_scaled)[0], 0, 100))
+        pred_ridge = float(np.clip(self.modelos['ridge'].predict(X_scaled)[0], 0, 100))
 
-        # ---- Componente Biológico (Índice de Favorabilidade) ----
-        indice_fav = features.get('indice_favorabilidade_semana', 0.3)
+        pred_final = (
+            self.pesos['rf'] * pred_rf +
+            self.pesos['xgb'] * pred_xgb +
+            self.pesos['ridge'] * pred_ridge
+        )
+        pred_final = round(max(0, min(100, pred_final)), 1)
 
-        # Escalar o índice: favorabilidade 0→0.1, 0.5→0.55, 1.0→0.95
-        # Garante que sempre há risco mínimo e nunca 100%
-        prob_bio = 0.1 + indice_fav * 0.85
+        # ---- Intervalo de Confianca ----
+        all_preds = [pred_rf, pred_xgb, pred_ridge]
+        spread = np.std(all_preds)
+        intervalo_inferior = round(max(0, min(all_preds) - spread), 1)
+        intervalo_superior = round(min(100, max(all_preds) + spread), 1)
 
-        # ---- Previsão Final (ponderada) ----
-        prob_combinada = PESO_BIOLOGICO * prob_bio + PESO_ML * prob_ml
-        prob_infeccao = round(prob_combinada * 100, 1)
-
-        # Confiança: baseada na concordância entre os dois componentes
-        # Quanto mais concordam, maior a confiança
-        diferenca = abs(prob_bio - prob_ml)
-        confianca = round((1.0 - diferenca * 0.5) * 100, 1)
+        # ---- Confianca ----
+        max_spread = 50.0
+        confianca = round((1.0 - min(spread / max_spread, 1.0)) * 100, 1)
         confianca = max(50.0, min(confianca, 99.0))
 
-        # Classificação baseada na probabilidade combinada
-        if prob_infeccao >= THRESHOLD_ALTO:
+        # ---- Classificacao ----
+        if pred_final >= THRESHOLD_ALTO:
             classificacao = "alto"
-        elif prob_infeccao >= THRESHOLD_MEDIO:
+        elif pred_final >= THRESHOLD_MEDIO:
             classificacao = "medio"
         else:
             classificacao = "baixo"
 
         return {
-            'percentual_infeccao': prob_infeccao,
+            'percentual_infeccao': pred_final,
             'classificacao': classificacao,
             'confianca': confianca,
+            'intervalo_confianca': {
+                'inferior': intervalo_inferior,
+                'superior': intervalo_superior,
+            },
             'detalhes': {
-                'probabilidade_ml': round(prob_ml * 100, 1),
-                'probabilidade_biologica': round(prob_bio * 100, 1),
-                'indice_favorabilidade': round(indice_fav, 3),
+                'predicao_rf': round(pred_rf, 1),
+                'predicao_xgb': round(pred_xgb, 1),
+                'predicao_ridge': round(pred_ridge, 1),
+                'predicao_ensemble': round(pred_final, 1),
+                'features_selecionadas': self.features_utilizadas,
                 'thresholds': {
                     'baixo': f'< {THRESHOLD_MEDIO}%',
                     'medio': f'{THRESHOLD_MEDIO}% - {THRESHOLD_ALTO}%',

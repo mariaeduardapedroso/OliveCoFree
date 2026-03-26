@@ -22,7 +22,7 @@ import {
   Leaf,
   Bug,
 } from 'lucide-react';
-import { Card, Button, Select, Alerta, Loading } from '../views/components';
+import { Card, Button, Select, Alerta, Loading, Paginacao } from '../views/components';
 import {
   obterInfoModelos,
   baixarTemplate,
@@ -74,6 +74,12 @@ const PainelCientifico = () => {
   const [modelos, setModelos] = useState([]);
   const [historico, setHistorico] = useState([]);
 
+  // Paginacao do historico
+  const [paginaHistorico, setPaginaHistorico] = useState(1);
+  const [totalPaginasHistorico, setTotalPaginasHistorico] = useState(1);
+  const [totalHistorico, setTotalHistorico] = useState(0);
+  const [tamanhoPaginaHistorico, setTamanhoPaginaHistorico] = useState(5);
+
   // --- Estados do upload ---
   const [doencaSelecionada, setDoencaSelecionada] = useState('olho-pavao');
   const [arquivoDoenca, setArquivoDoenca] = useState(null);
@@ -86,23 +92,26 @@ const PainelCientifico = () => {
   const [baixandoTemplate, setBaixandoTemplate] = useState(null);
 
   // --- Carregar dados ---
-  const carregarDados = useCallback(async () => {
-    setCarregando(true);
+  const carregarDados = async (showLoading = true) => {
+    if (showLoading) setCarregando(true);
     try {
-      const [modelosData, historicoData] = await Promise.all([
-        obterInfoModelos().catch(() => []),
-        obterHistoricoUploads().catch(() => []),
-      ]);
+      const modelosData = await obterInfoModelos().catch(() => []);
       setModelos(modelosData);
-      setHistorico(historicoData);
+
+      const historicoData = await obterHistoricoUploads(paginaHistorico, tamanhoPaginaHistorico).catch(() => null);
+      if (historicoData && historicoData.uploads) {
+        setHistorico(historicoData.uploads);
+        setTotalPaginasHistorico(historicoData.totalPaginas || 1);
+        setTotalHistorico(historicoData.total || 0);
+      }
     } finally {
       setCarregando(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     carregarDados();
-  }, [carregarDados]);
+  }, [paginaHistorico, tamanhoPaginaHistorico]);
 
   // --- Handlers ---
 
@@ -134,8 +143,8 @@ const PainelCientifico = () => {
       const inputs = document.querySelectorAll('input[type="file"]');
       inputs.forEach((input) => (input.value = ''));
 
-      // Recarregar modelos e historico
-      await carregarDados();
+      // Recarregar modelos e historico (sem mostrar loading global)
+      await carregarDados(false);
     } catch (err) {
       // Tratar erros de validacao (detail pode ser objeto com erros_doenca / erros_clima)
       if (err.detail && typeof err.detail === 'object') {
@@ -176,31 +185,34 @@ const PainelCientifico = () => {
   // ============================================================
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FlaskConical size={28} className="text-primary-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Painel Cientifico</h1>
-            <p className="text-sm text-gray-500">
-              Gerencie modelos de Machine Learning e envie novos dados de campo
-            </p>
-          </div>
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      {/* Cabeçalho */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <FlaskConical className="text-primary-600" />
+            Painel Cientifico
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Gerencie modelos de Machine Learning e envie novos dados de campo
+          </p>
         </div>
-        <Button
-          onClick={carregarDados}
-          className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors"
-        >
-          <RefreshCw size={16} />
-          Atualizar
-        </Button>
+
+        <div className="flex gap-3 mt-4 md:mt-0">
+          <Button
+            variant="outline"
+            onClick={carregarDados}
+            icone={<RefreshCw size={18} />}
+          >
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* ============================================================ */}
       {/* SECAO 1: METRICAS DOS MODELOS */}
       {/* ============================================================ */}
-      <section>
+      <section className="mt-2">
         <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <TrendingUp size={20} className="text-primary-600" />
           Metricas dos Modelos
@@ -217,7 +229,7 @@ const PainelCientifico = () => {
               <Card key={m.doencaId} className="relative">
                 {/* Badge da doenca */}
                 <div className="flex items-center gap-2 mb-4">
-                  <span className={`p-2 rounded-lg ${m.doencaId === 'olho-pavao' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <span className={`p-2 rounded-lg ${m.doencaId === 'olho-pavao' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>
                     {iconeDoenca(m.doencaId)}
                   </span>
                   <div>
@@ -278,7 +290,7 @@ const PainelCientifico = () => {
       {/* ============================================================ */}
       {/* SECAO 2: TEMPLATES + UPLOAD */}
       {/* ============================================================ */}
-      <section>
+      <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <FileSpreadsheet size={20} className="text-primary-600" />
           Templates e Upload de Dados
@@ -289,8 +301,8 @@ const PainelCientifico = () => {
           <Card titulo="Templates Excel" subtitulo="Baixe os modelos para preenchimento" icone={<Download size={20} />}>
             <div className="space-y-3">
               {[
-                { tipo: 'olho-pavao', label: 'Olho de Pavao', desc: 'Dados de incidencia (folhas)', icone: <Leaf size={16} />, cor: 'emerald' },
-                { tipo: 'antracnose', label: 'Antracnose', desc: 'Dados de incidencia (azeitonas)', icone: <Bug size={16} />, cor: 'amber' },
+                { tipo: 'olho-pavao', label: 'Olho de Pavao', desc: 'Dados de incidencia (folhas)', icone: <Leaf size={16} />, cor: 'pink' },
+                { tipo: 'antracnose', label: 'Antracnose', desc: 'Dados de incidencia (azeitonas)', icone: <Bug size={16} />, cor: 'purple' },
                 { tipo: 'clima', label: 'Dados Climaticos', desc: 'Temperatura, humidade, precipitacao', icone: <CloudRain size={16} />, cor: 'blue' },
               ].map((t) => (
                 <button
@@ -456,7 +468,7 @@ const PainelCientifico = () => {
       {/* ============================================================ */}
       {/* SECAO 3: HISTORICO DE UPLOADS */}
       {/* ============================================================ */}
-      <section>
+      <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <Database size={20} className="text-primary-600" />
           Historico de Uploads
@@ -479,6 +491,7 @@ const PainelCientifico = () => {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Data</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Pesquisador</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Doenca</th>
                     <th className="text-center px-4 py-3 font-medium text-gray-600">Amostras</th>
                     <th className="text-center px-4 py-3 font-medium text-gray-600">Anos</th>
@@ -491,9 +504,10 @@ const PainelCientifico = () => {
                   {historico.map((u) => (
                     <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-gray-700">{formatarData(u.dataUpload)}</td>
+                      <td className="px-4 py-3 text-gray-700">{u.usuarioNome || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          u.doencaId === 'olho-pavao' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          u.doencaId === 'olho-pavao' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'
                         }`}>
                           {iconeDoenca(u.doencaId)}
                           {nomeDoenca(u.doencaId)}
@@ -535,6 +549,21 @@ const PainelCientifico = () => {
                 </tbody>
               </table>
             </div>
+            {totalPaginasHistorico > 1 && (
+              <div className="p-4 border-t border-gray-200">
+                <Paginacao
+                  paginaAtual={paginaHistorico}
+                  totalPaginas={totalPaginasHistorico}
+                  totalRegistos={totalHistorico}
+                  tamanho={tamanhoPaginaHistorico}
+                  onPaginaChange={setPaginaHistorico}
+                  onTamanhoChange={(novoTamanho) => {
+                    setTamanhoPaginaHistorico(novoTamanho);
+                    setPaginaHistorico(1);
+                  }}
+                />
+              </div>
+            )}
           </Card>
         )}
       </section>

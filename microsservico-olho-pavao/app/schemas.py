@@ -44,6 +44,7 @@ class PrevisaoResponse(BaseModel):
     percentual_infeccao: float = Field(..., description="Probabilidade de infeção significativa (%)")
     classificacao: str = Field(..., description="Classificação de risco: baixo, medio ou alto")
     confianca: float = Field(..., description="Confiança do modelo na previsão (0-100%)")
+    intervalo_confianca: Optional[dict] = Field(default=None, description="Intervalo de confiança (inferior/superior)")
     detalhes: dict = Field(default_factory=dict, description="Detalhes adicionais")
 
 

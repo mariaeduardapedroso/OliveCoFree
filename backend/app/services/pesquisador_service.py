@@ -192,6 +192,25 @@ def validar_arquivo_doenca(df: pd.DataFrame, doenca_id: str) -> List[str]:
         erros.append("Ficheiro sem dados (0 linhas)")
         return erros
 
+    # Verificar valores nulos em TODAS as colunas
+    for col in df.columns:
+        nulos = df[col].isna().sum()
+        if nulos > 0:
+            linhas_nulas = df.index[df[col].isna()].tolist()[:5]
+            erros.append(f"Coluna '{col}' tem {nulos} valor(es) nulo(s) (linhas: {linhas_nulas})")
+
+    # Verificar strings vazias em TODAS as colunas de texto
+    for col in df.columns:
+        if df[col].dtype == object:
+            vazios_mask = df[col].astype(str).str.strip() == ''
+            vazios = vazios_mask.sum()
+            if vazios > 0:
+                linhas_vazias = df.index[vazios_mask].tolist()[:5]
+                erros.append(f"Coluna '{col}' tem {vazios} valor(es) vazio(s) (linhas: {linhas_vazias})")
+
+    if erros:
+        return erros
+
     # Verificar data parseavel
     try:
         pd.to_datetime(df['data'])
@@ -236,6 +255,25 @@ def validar_arquivo_clima(df: pd.DataFrame) -> List[str]:
         erros.append("Ficheiro sem dados (0 linhas)")
         return erros
 
+    # Verificar valores nulos em TODAS as colunas
+    for col in df.columns:
+        nulos = df[col].isna().sum()
+        if nulos > 0:
+            linhas_nulas = df.index[df[col].isna()].tolist()[:5]
+            erros.append(f"Coluna '{col}' tem {nulos} valor(es) nulo(s) (linhas: {linhas_nulas})")
+
+    # Verificar strings vazias em TODAS as colunas de texto
+    for col in df.columns:
+        if df[col].dtype == object:
+            vazios_mask = df[col].astype(str).str.strip() == ''
+            vazios = vazios_mask.sum()
+            if vazios > 0:
+                linhas_vazias = df.index[vazios_mask].tolist()[:5]
+                erros.append(f"Coluna '{col}' tem {vazios} valor(es) vazio(s) (linhas: {linhas_vazias})")
+
+    if erros:
+        return erros
+
     # Verificar ANO, MES, DIA sao inteiros
     for col in ['ANO', 'MES', 'DIA']:
         non_numeric = pd.to_numeric(df[col], errors='coerce').isna().sum()
@@ -255,22 +293,68 @@ def validar_arquivo_clima(df: pd.DataFrame) -> List[str]:
 # ENVIAR RETREINO AO MICROSSERVICO
 # ============================================================
 
-async def enviar_retreino(doenca_id: str, df_doenca: pd.DataFrame, df_clima: pd.DataFrame) -> dict:
-    """Envia dados para o microsservico retreinar o modelo."""
+def inserir_dados_upload(db: Session, doenca_id: str, df_doenca: pd.DataFrame, df_clima: pd.DataFrame):
+    """Insere dados de upload nas tabelas de treino do banco."""
+    from ..models.dados_treino import DadosOlhoPavao, DadosAntracnose, DadosClima
+
+    # Normalizar colunas da doenca
+    df_doenca = _normalizar_colunas(df_doenca)
+
+    if doenca_id == "olho-pavao":
+        registos = []
+        for _, row in df_doenca.iterrows():
+            registos.append(DadosOlhoPavao(
+                data=pd.to_datetime(row.get('data')),
+                repeticao=int(row['repeticao']) if pd.notna(row.get('repeticao')) else None,
+                arvore=int(row['arvore']) if pd.notna(row.get('arvore')) else None,
+                folha=int(row['folha']) if pd.notna(row.get('folha')) else None,
+                visiveis=int(row['visiveis']) if pd.notna(row.get('visiveis')) else None,
+                visiveis_latentes=int(row['visiveis + latentes']) if pd.notna(row.get('visiveis + latentes')) else None,
+            ))
+        db.bulk_save_objects(registos)
+    else:
+        registos = []
+        for _, row in df_doenca.iterrows():
+            registos.append(DadosAntracnose(
+                data=pd.to_datetime(row.get('data')),
+                olival_parcela=str(row['olival/parcela']) if pd.notna(row.get('olival/parcela')) else None,
+                arvore=int(row['arvore']) if pd.notna(row.get('arvore')) else None,
+                azeitona=int(row['azeitona']) if pd.notna(row.get('azeitona')) else None,
+                severidade=float(row['severidade']) if pd.notna(row.get('severidade')) else None,
+                incidencia=float(row['incidencia']) if pd.notna(row.get('incidencia')) else None,
+            ))
+        db.bulk_save_objects(registos)
+
+    # Inserir dados de clima
+    df_clima.columns = [str(c).strip().upper() for c in df_clima.columns]
+    registos_clima = []
+    for _, row in df_clima.iterrows():
+        registos_clima.append(DadosClima(
+            ano=int(row['ANO']),
+            mes=int(row['MES']),
+            dia=int(row['DIA']),
+            t_med=float(row['T_MED']) if pd.notna(row.get('T_MED')) else None,
+            t_max=float(row['T_MAX']) if pd.notna(row.get('T_MAX')) else None,
+            t_min=float(row['T_MIN']) if pd.notna(row.get('T_MIN')) else None,
+            hr_med=float(row['HR_MED']) if pd.notna(row.get('HR_MED')) else None,
+            ff_med=float(row['FF_MED']) if pd.notna(row.get('FF_MED')) else None,
+            pr_qtd=float(row['PR_QTD']) if pd.notna(row.get('PR_QTD')) else None,
+        ))
+    db.bulk_save_objects(registos_clima)
+    db.commit()
+
+
+async def enviar_retreino(doenca_id: str) -> dict:
+    """Envia pedido de retreino ao microsservico (dados ja estao no banco)."""
     base_url = _MICROSSERVICO_URLS.get(doenca_id)
     if not base_url:
         raise Exception(f"Doenca desconhecida: {doenca_id}")
-
-    payload = {
-        "dados_doenca": df_doenca.to_dict(orient='records'),
-        "dados_clima": df_clima.to_dict(orient='records'),
-    }
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{base_url}/modelo/retreinar",
-                json=payload,
+                json={},
                 timeout=120.0,
             )
             response.raise_for_status()
@@ -320,15 +404,23 @@ def registrar_upload(
     return upload
 
 
-def listar_uploads(db: Session) -> list:
-    """Lista historico de uploads com nome do usuario."""
+def listar_uploads(db: Session, pagina: int = 1, tamanho: int = 10) -> dict:
+    """Lista historico de uploads com nome do usuario e paginacao."""
     from ..models.usuario import Usuario
-    uploads = (
+    from sqlalchemy import func
+
+    query = (
         db.query(UploadDados, Usuario.nome)
         .join(Usuario, UploadDados.usuario_id == Usuario.id)
         .order_by(desc(UploadDados.criado_em))
-        .all()
     )
+
+    total = db.query(func.count(UploadDados.id)).scalar()
+    total_paginas = max(1, (total + tamanho - 1) // tamanho)
+    pagina = max(1, min(pagina, total_paginas))
+
+    uploads = query.offset((pagina - 1) * tamanho).limit(tamanho).all()
+
     resultado = []
     for upload, nome in uploads:
         resultado.append({
@@ -345,4 +437,11 @@ def listar_uploads(db: Session) -> list:
             'f1_depois': float(upload.f1_depois),
             'total_amostras_depois': upload.total_amostras_depois,
         })
-    return resultado
+
+    return {
+        'uploads': resultado,
+        'pagina': pagina,
+        'tamanho': tamanho,
+        'total': total,
+        'total_paginas': total_paginas,
+    }

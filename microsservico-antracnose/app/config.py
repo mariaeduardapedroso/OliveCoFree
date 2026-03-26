@@ -1,8 +1,13 @@
 """
 Configuracoes do Microsservico Antracnose
 """
+import os
 
-# URLs dos dados no GitHub (carregados em tempo de execucao)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://olivecofree:olivecofree2024@localhost:5432/olivecofree"
+)
+
 URLS_DOENCA = [
     "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2024_Data_Anthracnose.xlsx",
     "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/2025_Data_Anthracnose.xlsx",
@@ -14,22 +19,31 @@ SHEETS_DOENCA = [
 URL_CLIMA = "https://raw.githubusercontent.com/mariaeduardapedroso/Dados-tese/main/clima.xlsx"
 SHEET_CLIMA = "Mirandela"
 
-# Threshold para classificacao binaria no treino (% infectadas)
 PERCENTAGEM_INFECTADO = 10
+THRESHOLD_MEDIO = 8.0
+THRESHOLD_ALTO = 12.0
 
-# Thresholds para classificacao baixo/medio/alto (probabilidade do modelo)
-THRESHOLD_MEDIO = 8.0    # >= 8% -> medio
-THRESHOLD_ALTO = 12.0    # >= 12% -> alto
+CANDIDATE_FEATURES = [
+    'semana_do_ano',
+    'temp_media_semana',
+    'temp_max_semana',
+    'temp_min_semana',
+    'amplitude_termica',
+    'humidade_semana',
+    'precipitacao_semana',
+    'precipitacao_acumulada_2sem',
+    'vento_semana',
+    'temp_media_2sem_anterior',
+    'humidade_2sem_anterior',
+    'dias_chuva_semana',
+]
 
-# Features usadas no componente ML do modelo
-FEATURES_MODELO = [
+FALLBACK_FEATURES = [
     'semana_do_ano',
     'temp_media_semana',
     'humidade_semana',
     'precipitacao_semana',
     'vento_semana',
-    'indice_favorabilidade_semana',
 ]
 
-# Porta do servico
 PORT = 8003

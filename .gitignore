@@ -31,6 +31,22 @@ __pycache__/
 *.pyd
 .Python
 
+# Microsservico Antracnose Python
+microsservico-antracnose/venv/
+microsservico-antracnose/__pycache__/
+microsservico-antracnose/*.py[cod]
+microsservico-antracnose/*.pyo
+microsservico-antracnose/*.pyd
+microsservico-antracnose/.Python
+
+# Microsservico Olho de Pavão Python
+microsservico-olho-pavao/venv/
+microsservico-olho-pavao/__pycache__/
+microsservico-olho-pavao/*.py[cod]
+microsservico-olho-pavao/*.pyo
+microsservico-olho-pavao/*.pyd
+microsservico-olho-pavao/.Python
+
 # Environment
 .env
 .env.local

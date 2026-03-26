@@ -116,7 +116,7 @@ const EsqueciSenha = () => {
                   Verifique sua caixa de entrada e spam.
                 </p>
 
-                <div className="mt-6 space-y-3">
+                <div className="mt-6 flex flex-col gap-3">
                   <Button
                     variant="primary"
                     fullWidth
@@ -128,7 +128,7 @@ const EsqueciSenha = () => {
                     Enviar novamente
                   </Button>
 
-                  <Link to="/login">
+                  <Link to="/login" className="block">
                     <Button variant="outline" fullWidth>
                       Voltar para o login
                     </Button>

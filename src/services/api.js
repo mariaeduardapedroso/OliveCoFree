@@ -4,7 +4,9 @@
  * Serviço para comunicação com o backend FastAPI.
  */
 
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8001/api'
+  : '/api';
 
 /**
  * Obtém o token JWT do localStorage
@@ -221,8 +223,8 @@ export const apiUploadDados = async (doencaId, arquivoDoenca, arquivoClima) => {
   return await fetchAPIUpload('/pesquisador/upload', formData);
 };
 
-export const apiListarUploads = async () => {
-  return await fetchAPI('/pesquisador/uploads');
+export const apiListarUploads = async (pagina = 1, tamanho = 10) => {
+  return await fetchAPI(`/pesquisador/uploads?pagina=${pagina}&tamanho=${tamanho}`);
 };
 
 // ==================== HEALTH ====================

@@ -1,0 +1,118 @@
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: olivecofree-db
+    environment:
+      POSTGRES_USER: olivecofree
+      POSTGRES_PASSWORD: olivecofree2024
+      POSTGRES_DB: olivecofree
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U olivecofree -d olivecofree"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - olivecofree-net
+    restart: unless-stopped
+
+  # ── Frontend (React + Nginx) ──────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: olivecofree-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - olivecofree-net
+    restart: unless-stopped
+
+  # ── Backend (FastAPI) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: olivecofree-backend
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://olivecofree:olivecofree2024@db:5432/olivecofree
+      - MICROSSERVICO_OLHO_PAVAO_URL=http://microsservico-olho-pavao:8002
+      - MICROSSERVICO_ANTRACNOSE_URL=http://microsservico-antracnose:8003
+      - FRONTEND_URL=http://localhost
+    depends_on:
+      db:
+        condition: service_healthy
+      microsservico-olho-pavao:
+        condition: service_healthy
+      microsservico-antracnose:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - olivecofree-net
+    restart: unless-stopped
+
+  # ── Microsserviço Olho de Pavão ───────────────────────────
+  microsservico-olho-pavao:
+    build:
+      context: ./microsservico-olho-pavao
+      dockerfile: Dockerfile
+    container_name: olivecofree-ms-olho-pavao
+    environment:
+      - DATABASE_URL=postgresql://olivecofree:olivecofree2024@db:5432/olivecofree
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - olivecofree-net
+    restart: unless-stopped
+
+  # ── Microsserviço Antracnose ──────────────────────────────
+  microsservico-antracnose:
+    build:
+      context: ./microsservico-antracnose
+      dockerfile: Dockerfile
+    container_name: olivecofree-ms-antracnose
+    environment:
+      - DATABASE_URL=postgresql://olivecofree:olivecofree2024@db:5432/olivecofree
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - olivecofree-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  olivecofree-net:
+    driver: bridge

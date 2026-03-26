@@ -77,12 +77,12 @@ export const enviarDados = async (doencaId, arquivoDoenca, arquivoClima) => {
 };
 
 /**
- * Obtem historico de uploads do pesquisador.
+ * Obtem historico de uploads do pesquisador com paginacao.
  */
-export const obterHistoricoUploads = async () => {
-  const uploads = await apiListarUploads();
+export const obterHistoricoUploads = async (pagina = 1, tamanho = 10) => {
+  const response = await apiListarUploads(pagina, tamanho);
 
-  return (uploads || []).map((u) => ({
+  const uploads = (response.uploads || []).map((u) => ({
     id: u.id,
     doencaId: u.doenca_id,
     usuarioNome: u.usuario_nome,
@@ -96,6 +96,14 @@ export const obterHistoricoUploads = async () => {
     f1Depois: u.f1_depois,
     totalAmostrasDepois: u.total_amostras_depois,
   }));
+
+  return {
+    uploads,
+    pagina: response.pagina || 1,
+    tamanho: response.tamanho || 10,
+    total: response.total || 0,
+    totalPaginas: response.total_paginas || 1,
+  };
 };
 
 export default {

@@ -2,7 +2,7 @@
 Schemas Pydantic do Microsservico Antracnose
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class PrevisaoRequest(BaseModel):
@@ -44,6 +44,7 @@ class PrevisaoResponse(BaseModel):
     percentual_infeccao: float = Field(..., description="Probabilidade de infecao significativa (%)")
     classificacao: str = Field(..., description="Classificacao de risco: baixo, medio ou alto")
     confianca: float = Field(..., description="Confianca do modelo na previsao (0-100%)")
+    intervalo_confianca: Optional[dict] = Field(default=None, description="Intervalo de confianca (inferior/superior)")
     detalhes: dict = Field(default_factory=dict, description="Detalhes adicionais")
 
 

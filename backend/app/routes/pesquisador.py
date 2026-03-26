@@ -148,12 +148,16 @@ async def upload_dados(
             detail=detail,
         )
 
-    # 4. Obter metricas antes do retreino
+    # 4. Inserir dados no banco
+    from ..services.pesquisador_service import inserir_dados_upload
+    inserir_dados_upload(db, doenca_id, df_doenca, df_clima)
+
+    # 5. Obter metricas antes do retreino
     metricas_antes = await obter_info_modelo_unico(doenca_id)
 
-    # 5. Enviar para microsservico retreinar
+    # 6. Enviar para microsservico retreinar (dados ja estao no banco)
     try:
-        resultado = await enviar_retreino(doenca_id, df_doenca, df_clima)
+        resultado = await enviar_retreino(doenca_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -223,8 +227,10 @@ async def upload_dados(
 
 @router.get("/uploads")
 async def historico_uploads(
+    pagina: int = 1,
+    tamanho: int = 10,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_pesquisador),
 ):
-    """Retorna historico de uploads de dados."""
-    return listar_uploads(db)
+    """Retorna historico de uploads de dados com paginacao."""
+    return listar_uploads(db, pagina=pagina, tamanho=tamanho)

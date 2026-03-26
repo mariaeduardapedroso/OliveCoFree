@@ -17,7 +17,7 @@ from .routes import clima_router, auth_router, previsao_router, pesquisador_rout
 async def lifespan(app: FastAPI):
     """Lifecycle events"""
     # Startup
-    from .models import Usuario, Previsao, Doenca
+    from .models import Usuario, Previsao, Doenca, UploadDados, DadosOlhoPavao, DadosAntracnose, DadosClima
 
     # Criar tabelas
     Base.metadata.create_all(bind=engine)
@@ -71,6 +71,10 @@ async def lifespan(app: FastAPI):
 
         db.commit()
         print("[OK] Banco de dados inicializado")
+
+        # Semear dados de treino (se tabelas vazias)
+        from .services.seed_service import seed_dados_treino
+        seed_dados_treino(db)
     except Exception as e:
         print(f"[ERRO] Erro ao inicializar banco: {e}")
     finally:

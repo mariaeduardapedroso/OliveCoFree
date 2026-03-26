@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.git/
+.gitignore
+*.pyc
+__pycache__/
+*.md
+.env
+.claude/

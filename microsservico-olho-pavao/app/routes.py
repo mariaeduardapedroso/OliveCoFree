@@ -3,9 +3,9 @@ Rotas da API - Microsserviço Olho de Pavão
 """
 import pandas as pd
 from fastapi import APIRouter, HTTPException, status
-from .schemas import PrevisaoRequest, PrevisaoResponse, ModeloInfo, HealthResponse, RetreinoRequest
-from .pipeline import calcular_features_do_input, preparar_dataset_com_novos_dados
-from .config import FEATURES_MODELO, THRESHOLD_MEDIO, THRESHOLD_ALTO
+from .schemas import PrevisaoRequest, PrevisaoResponse, ModeloInfo, HealthResponse
+from .pipeline import calcular_features_do_input, preparar_dataset_treino
+from .config import THRESHOLD_MEDIO, THRESHOLD_ALTO
 
 router = APIRouter()
 
@@ -54,6 +54,7 @@ async def fazer_previsao(request: PrevisaoRequest):
         humidade=request.humidade,
         precipitacao=request.precipitacao,
         velocidade_vento=request.velocidade_vento,
+        features_selecionadas=modelo.features_utilizadas,
     )
 
     # Fazer previsão
@@ -67,10 +68,10 @@ async def fazer_previsao(request: PrevisaoRequest):
 
 
 @router.post("/modelo/retreinar", response_model=ModeloInfo, tags=["Modelo"])
-async def retreinar_modelo(request: RetreinoRequest):
+async def retreinar_modelo():
     """
-    Retreina o modelo com novos dados enviados pelo pesquisador.
-    Combina os dados novos com os dados originais do GitHub.
+    Retreina o modelo com todos os dados do banco de dados.
+    Os dados novos ja foram inseridos pelo backend antes de chamar este endpoint.
     """
     if not modelo:
         raise HTTPException(
@@ -79,11 +80,8 @@ async def retreinar_modelo(request: RetreinoRequest):
         )
 
     try:
-        df_doenca = pd.DataFrame(request.dados_doenca)
-        df_clima = pd.DataFrame(request.dados_clima)
-
-        # Combinar dados novos com GitHub e retreinar
-        df_treino = preparar_dataset_com_novos_dados(df_doenca, df_clima)
+        # Le todos os dados do banco e retreina
+        df_treino = preparar_dataset_treino()
         modelo.treinar(df_treino)
 
     except Exception as e:
