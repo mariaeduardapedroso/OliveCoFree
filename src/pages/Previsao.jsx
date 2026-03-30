@@ -432,23 +432,64 @@ const Previsao = () => {
                   </Card>
 
                   {/* Recomendações */}
-                  <Card
-                    titulo="Recomendações"
-                    icone={<Lightbulb size={24} />}
-                    className={`border-2 ${getCorRisco(resultado.risco).border}`}
-                  >
-                    <ul className="space-y-2">
-                      {resultado.recomendacoes?.map((rec, index) => (
-                        <li
-                          key={index}
-                          className="flex items-start gap-2 text-sm text-gray-700"
-                        >
-                          <span className={`mt-1 ${getCorRisco(resultado.risco).text}`}>•</span>
-                          {rec}
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
+                  {resultado.recomendacoes?.length > 0 ? (
+                    <Card
+                      titulo="Recomendações"
+                      icone={<Lightbulb size={24} />}
+                      className={`border-2 ${getCorRisco(resultado.risco).border}`}
+                    >
+                      <div className="space-y-4">
+                        {resultado.recomendacoes.map((rec, index) => {
+                          // Verifica se contém práticas culturais numeradas
+                          const practicasMatch = rec.match(/^(.*?):\s*\(i\)\s*(.*?);\s*\(ii\)\s*(.*?)(?:;\s*\(iii\)\s*(.*?))?\.?$/s);
+                          if (practicasMatch) {
+                            const [, intro, p1, p2, p3] = practicasMatch;
+                            return (
+                              <div key={index}>
+                                <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                                  {intro.trim()}:
+                                </p>
+                                <ul className="ml-4 space-y-1.5">
+                                  <li className="text-sm text-gray-700 flex items-start gap-2">
+                                    <span className="text-primary-600 font-semibold mt-0.5">i.</span>
+                                    <span>{p1.trim()}</span>
+                                  </li>
+                                  <li className="text-sm text-gray-700 flex items-start gap-2">
+                                    <span className="text-primary-600 font-semibold mt-0.5">ii.</span>
+                                    <span>{p2.trim()}</span>
+                                  </li>
+                                  {p3 && (
+                                    <li className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-primary-600 font-semibold mt-0.5">iii.</span>
+                                      <span>{p3.trim()}</span>
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
+                            );
+                          }
+                          return (
+                            <p
+                              key={index}
+                              className="text-sm text-gray-700 leading-relaxed"
+                            >
+                              {rec}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card
+                      titulo="Recomendações"
+                      icone={<Lightbulb size={24} />}
+                      className="border-2 border-green-200"
+                    >
+                      <p className="text-sm text-green-700">
+                        Sem recomendações adicionais para este nível de risco. Manter as práticas habituais de monitorização.
+                      </p>
+                    </Card>
+                  )}
 
                   {/* Detalhes Técnicos */}
                   <Card>
@@ -513,21 +554,24 @@ const Previsao = () => {
           <Lightbulb className="text-yellow-500 flex-shrink-0" size={24} />
           <div>
             <h4 className="font-medium text-gray-800">Sobre o Modelo</h4>
+            <p className="text-sm text-gray-600 mt-1">
+              O modelo disponibilizado foi desenvolvido para cultivares moderadamente
+              suscetíveis à gafa e olho de pavão, em olival tradicional e de sequeiro,
+              para a região de Mirandela (Nordeste de Portugal).
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Trata-se de um modelo previsional, de ajuda à tomada de decisão,
+              que <strong>não substitui a consulta de um técnico agrícola</strong>.
+            </p>
             {doencaSelecionada === 'olho-pavao' ? (
-              <p className="text-sm text-gray-600 mt-1">
-                Este sistema utiliza um modelo de machine learning treinado com dados
-                históricos de <strong>Olho de Pavão</strong> (<em>Spilocaea oleagina</em>) em olivais de Mirandela
-                (2021-2023). A previsão usa dados climáticos da semana para prever
-                a infecção. Condições favoráveis ao fungo:
-                temperatura entre 15-20°C e humidade acima de 80%.
+              <p className="text-sm text-gray-600 mt-2">
+                Condições favoráveis ao <strong>Olho de Pavão</strong> (<em>Spilocaea oleagina</em>):
+                temperaturas amenas (15-20°C) e humidade relativa elevada (acima de 80%).
               </p>
             ) : (
-              <p className="text-sm text-gray-600 mt-1">
-                Este sistema utiliza um modelo de machine learning treinado com dados
-                históricos de <strong>Antracnose</strong> (<em>Colletotrichum spp.</em>) em olivais de Mirandela
-                (2021-2023). A previsão usa dados climáticos da semana para prever
-                a infecção. Condições favoráveis ao fungo:
-                temperatura entre 10-25°C, humidade alta e períodos de chuva.
+              <p className="text-sm text-gray-600 mt-2">
+                Condições favoráveis à <strong>Gafa/Antracnose</strong> (<em>Colletotrichum spp.</em>):
+                temperaturas amenas (10-25°C), humidade elevada e períodos de chuva.
               </p>
             )}
           </div>

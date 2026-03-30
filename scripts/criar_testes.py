@@ -244,8 +244,11 @@ print("Valido Olho de Pavao 5 criado!")
 # ============================================================
 
 dados_pavao_20 = []
+from datetime import date, timedelta
+base_p = date(2026, 3, 5)
 for semana_offset in range(5):
-    base_date = f"2026-03-{5 + semana_offset * 7:02d}"
+    d = base_p + timedelta(weeks=semana_offset)
+    base_date = d.strftime("%Y-%m-%d")
     for rep in range(1, 3):
         for arv in range(1, 3):
             vis = random.randint(0, 3)
@@ -260,9 +263,11 @@ criar_excel_doenca(
 )
 
 clima_pavao_20 = []
-for d in range(1, 36):
-    dia = ((d - 1) % 28) + 1
-    mes = 3
+base_cp = date(2026, 3, 1)
+for d in range(35):
+    dt = base_cp + timedelta(days=d)
+    mes = dt.month
+    dia = dt.day
     t_med = round(10 + random.uniform(-2, 5), 1)
     t_max = int(round(t_med + random.uniform(3, 8), 0))
     t_min = int(round(t_med - random.uniform(3, 6), 0))
@@ -311,8 +316,11 @@ print("Valido Antracnose 5 criado!")
 # ============================================================
 
 dados_antrac_20 = []
+from datetime import date, timedelta
+base = date(2026, 10, 8)
 for semana_offset in range(5):
-    base_date = f"2026-10-{8 + semana_offset * 7:02d}"
+    d = base + timedelta(weeks=semana_offset)
+    base_date = d.strftime("%Y-%m-%d")
     for arv in range(1, 3):
         for az in range(1, 3):
             sev = round(random.uniform(0, 3), 1)
@@ -327,9 +335,11 @@ criar_excel_doenca(
 )
 
 clima_antrac_20 = []
-for d in range(1, 36):
-    dia = 7 + ((d - 1) % 24)
-    mes = 10
+base_ca = date(2026, 10, 7)
+for d in range(35):
+    dt = base_ca + timedelta(days=d)
+    mes = dt.month
+    dia = dt.day
     t_med = round(17 + random.uniform(-3, 6), 1)
     t_max = int(round(t_med + random.uniform(4, 8), 0))
     t_min = int(round(t_med - random.uniform(3, 5), 0))

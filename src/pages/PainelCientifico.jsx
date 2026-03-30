@@ -20,8 +20,8 @@ import {
   Trash2,
   CloudRain,
   Leaf,
-  Bug,
 } from 'lucide-react';
+import OliveIcon from '../views/icons/OliveIcon';
 import { Card, Button, Select, Alerta, Loading, Paginacao } from '../views/components';
 import {
   obterInfoModelos,
@@ -61,7 +61,7 @@ const nomeDoenca = (id) => {
 
 const iconeDoenca = (id) => {
   if (id === 'olho-pavao') return <Leaf size={20} />;
-  return <Bug size={20} />;
+  return <OliveIcon size={20} />;
 };
 
 // ============================================================
@@ -302,7 +302,7 @@ const PainelCientifico = () => {
             <div className="space-y-3">
               {[
                 { tipo: 'olho-pavao', label: 'Olho de Pavao', desc: 'Dados de incidencia (folhas)', icone: <Leaf size={16} />, cor: 'pink' },
-                { tipo: 'antracnose', label: 'Antracnose', desc: 'Dados de incidencia (azeitonas)', icone: <Bug size={16} />, cor: 'purple' },
+                { tipo: 'antracnose', label: 'Antracnose', desc: 'Dados de incidencia (azeitonas)', icone: <OliveIcon size={16} />, cor: 'purple' },
                 { tipo: 'clima', label: 'Dados Climaticos', desc: 'Temperatura, humidade, precipitacao', icone: <CloudRain size={16} />, cor: 'blue' },
               ].map((t) => (
                 <button

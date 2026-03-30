@@ -8,6 +8,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Leaf, Shield, BarChart3, Cloud, ArrowRight, ChevronDown } from 'lucide-react';
+import OliveIcon from '../views/icons/OliveIcon';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ const LandingPage = () => {
 
           {/* Tagline */}
           <p className="text-xl md:text-2xl text-gray-600 mb-4 max-w-2xl mx-auto leading-relaxed">
-            Sistema inteligente de previsão de doenças em oliveiras
+            Sistema de apoio à decisão para a proteção fitossanitária do olival
           </p>
           <p className="text-base md:text-lg text-gray-500 mb-10 max-w-xl mx-auto">
             Proteja o seu olival com modelos preditivos baseados em dados climáticos e epidemiológicos
@@ -76,8 +77,8 @@ const LandingPage = () => {
               O <strong>OliveCoFree</strong> é um projeto de investigação desenvolvido no âmbito
               de uma dissertação de mestrado no <strong>Instituto Politécnico de Bragança (IPB)</strong>,
               com o apoio do <strong>CeDRI</strong> e financiamento da <strong>Fundação "la Caixa"</strong> e <strong>BPI</strong>.
-              O objetivo é desenvolver ferramentas preditivas para auxiliar os olivicultores
-              na deteção precoce de doenças fúngicas que afetam os olivais.
+              O objetivo é desenvolver modelos previsionais de apoio à tomada de decisão,
+              para auxiliar os olivicultores na deteção precoce de doenças fúngicas que afetam os olivais.
             </p>
           </div>
 
@@ -85,13 +86,13 @@ const LandingPage = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <FeatureCard
               icon={<Shield size={28} />}
-              title="Deteção Precoce"
-              description="Identifique riscos de infeção antes dos sintomas visíveis, permitindo ação preventiva."
+              title="Apoio à Decisão"
+              description="Modelos previsionais que auxiliam o olivicultor na tomada de decisão, sem substituir a consulta de um técnico agrícola."
             />
             <FeatureCard
               icon={<Cloud size={28} />}
               title="Dados Climáticos"
-              description="Integração com dados meteorológicos em tempo real para previsões precisas."
+              description="Integração com dados meteorológicos para previsões adaptadas às condições climáticas da região."
             />
             <FeatureCard
               icon={<BarChart3 size={28} />}
@@ -101,7 +102,7 @@ const LandingPage = () => {
             <FeatureCard
               icon={<Leaf size={28} />}
               title="Duas Doenças"
-              description="Previsão para Olho de Pavão (Spilocaea oleagina) e Antracnose (Colletotrichum spp.)."
+              description="Olho de Pavão (Spilocaea oleagina) e Gafa/Antracnose (Colletotrichum spp.) em cultivares moderadamente suscetíveis."
             />
           </div>
         </div>
@@ -126,23 +127,24 @@ const LandingPage = () => {
               <h3 className="text-xl font-bold text-gray-800 mb-3">Olho de Pavão</h3>
               <p className="text-sm text-gray-500 italic mb-3">Spilocaea oleagina</p>
               <p className="text-gray-600 leading-relaxed">
-                Doença foliar que provoca manchas circulares nas folhas das oliveiras,
-                levando à desfoliação e redução da produção. Favorecida por temperaturas
-                entre 15-20°C e humidade relativa superior a 80%.
+                Doença foliar causada pelo fungo <em>Spilocaea oleagina</em>, que provoca manchas
+                circulares nas folhas das oliveiras, levando à desfoliação e redução da produção.
+                Favorecida por temperaturas amenas (15-20°C) e humidade relativa elevada.
               </p>
             </div>
 
             {/* Antracnose */}
             <div className="bg-white rounded-2xl p-8 shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
               <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mb-5">
-                <Leaf className="text-purple-600" size={28} />
+                <OliveIcon className="text-purple-600" size={28} />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">Antracnose</h3>
+              <h3 className="text-xl font-bold text-gray-800 mb-3">Gafa (Antracnose)</h3>
               <p className="text-sm text-gray-500 italic mb-3">Colletotrichum spp.</p>
               <p className="text-gray-600 leading-relaxed">
-                Doença que afeta os frutos das oliveiras causando podridão e mumificação
-                das azeitonas. A disseminação ocorre por salpico de chuva, sendo favorecida
-                por temperaturas entre 20-25°C e elevada humidade.
+                Doença que afeta os frutos das oliveiras, causada por fungos do género{' '}
+                <em>Colletotrichum</em>, provocando podridão e mumificação das azeitonas.
+                A disseminação ocorre por salpico de chuva, sendo favorecida por temperaturas
+                amenas (20-25°C) e elevada humidade.
               </p>
             </div>
           </div>
@@ -163,17 +165,17 @@ const LandingPage = () => {
             <StepCard
               step="01"
               title="Recolha de Dados"
-              description="Dados climáticos são recolhidos automaticamente da estação meteorológica de Mirandela."
+              description="Os dados climáticos da região são utilizados para alimentar os modelos preditivos."
             />
             <StepCard
               step="02"
               title="Análise Preditiva"
-              description="Os modelos de Machine Learning analisam padrões climáticos e calculam o risco de infeção."
+              description="Os modelos de Machine Learning analisam as condições climáticas e estimam o risco de infeção para cada doença."
             />
             <StepCard
               step="03"
-              title="Alerta ao Produtor"
-              description="O sistema gera alertas e recomendações para que o produtor possa agir preventivamente."
+              title="Apoio à Decisão"
+              description="O sistema fornece recomendações de tratamento adequadas ao nível de risco, auxiliando o olivicultor na tomada de decisão."
             />
           </div>
         </div>
@@ -185,8 +187,12 @@ const LandingPage = () => {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Pronto para proteger o seu olival?
           </h2>
-          <p className="text-primary-100 text-lg mb-8">
+          <p className="text-primary-100 text-lg mb-4">
             Aceda ao sistema e consulte as previsões para a sua região.
+          </p>
+          <p className="text-primary-200 text-sm mb-8 max-w-2xl mx-auto">
+            Modelo desenvolvido para cultivares moderadamente suscetíveis, em olival tradicional e de sequeiro, para a região de Mirandela.
+            Trata-se de um modelo previsional de ajuda à tomada de decisão, que não substitui a consulta de um técnico agrícola.
           </p>
           <button
             onClick={() => navigate('/login')}

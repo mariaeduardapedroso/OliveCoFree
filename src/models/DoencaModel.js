@@ -39,14 +39,27 @@ export const getNivelRisco = (doencaId, percentual) => {
 export const getRecomendacoesDoenca = (doencaId, risco) => {
   const recs = {
     'olho-pavao': {
-      baixo: ['Manter monitoramento de rotina das folhas', 'Verificar condições climáticas semanalmente'],
-      medio: ['Intensificar inspeção visual das folhas', 'Considerar aplicação preventiva de fungicida cúprico', 'Remover folhas caídas do solo'],
-      alto: ['Aplicar tratamento fungicida imediatamente', 'Remover e destruir folhas infectadas', 'Consultar técnico agrícola']
+      baixo: [],
+      medio: [
+        'Se as condições climáticas forem favoráveis ao desenvolvimento da doença (temperaturas amenas e humidade elevada), recomenda-se a monitorização regular das folhas mais novas, procurando o aparecimento de manchas características.',
+        'Se forem observados sintomas recentes de infeção e se as condições climáticas se mantiverem favoráveis, deve considerar a aplicação de um produto antifúngico homologado para oliveira, em tratamento preferencialmente preventivo, respeitando sempre as indicações de rótulo. Esta prática é sobretudo recomendável para olivais com cultivares mais suscetíveis à doença.',
+        'Pondere, ainda, realizar as seguintes práticas culturais: (i) Favorecer o arejamento da copa através da poda; (ii) Gerir a fertilização de modo a evitar o excesso de nitrogénio e a deficiência em potássio; (iii) Remover e destruir as folhas e restos de poda do solo.'
+      ],
+      alto: [
+        'Se as condições climáticas forem favoráveis ao desenvolvimento da doença (temperaturas amenas e humidade elevada), recomenda-se a aplicação de um produto antifúngico homologado para oliveira, em tratamento preferencialmente preventivo, respeitando sempre as indicações de rótulo.',
+        'Pondere, ainda, realizar as seguintes práticas culturais: (i) Favorecer o arejamento da copa através da poda; (ii) Gerir a fertilização de modo a evitar o excesso de nitrogénio e a deficiência em potássio; (iii) Remover e destruir as folhas e restos de poda do solo.'
+      ]
     },
     'antracnose': {
-      baixo: ['Monitorar estado dos frutos regularmente', 'Manter boas práticas de higiene no olival'],
-      medio: ['Inspecionar frutos para sinais de podridão', 'Aplicar fungicida preventivo', 'Antecipar colheita se possível'],
-      alto: ['Aplicar tratamento fungicida urgente', 'Colher frutos saudáveis imediatamente', 'Consultar técnico agrícola']
+      baixo: [],
+      medio: [
+        'Se as condições climáticas se mantiverem favoráveis (i.e., temperaturas amenas e humidade elevada), deve considerar a aplicação de um produto antifúngico homologado para oliveira, em tratamento preferencialmente preventivo, respeitando sempre as indicações de rótulo. Esta prática é sobretudo recomendável para olivais com cultivares mais suscetíveis à doença.',
+        'Pondere, ainda, realizar as seguintes práticas culturais: (i) Favorecer o arejamento da copa através da poda; (ii) Remover e destruir restos de poda e frutos infetados do solo.'
+      ],
+      alto: [
+        'Se as condições climáticas se mantiverem favoráveis (i.e., temperaturas amenas e humidade elevada), aplicar um produto antifúngico homologado para oliveira, em tratamento preferencialmente preventivo, respeitando sempre as indicações de rótulo.',
+        'Pondere, ainda, realizar as seguintes práticas culturais: (i) Favorecer o arejamento da copa através da poda; (ii) Remover e destruir restos de poda e frutos infetados do solo.'
+      ]
     }
   };
   return recs[doencaId]?.[risco] || recs['olho-pavao'][risco];
