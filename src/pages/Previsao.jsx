@@ -424,6 +424,7 @@ const Previsao = () => {
                       <GaugeRisco
                         percentual={resultado.percentualInfectadas}
                         tamanho={200}
+                        thresholds={resultado.doenca?.thresholds}
                       />
                       <p className="text-sm text-gray-500 mt-4">
                         Confiança do modelo: {resultado.confianca}%

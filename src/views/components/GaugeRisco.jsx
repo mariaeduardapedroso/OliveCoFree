@@ -2,46 +2,46 @@
  * VIEW: GaugeRisco
  *
  * Componente visual de gauge/velocímetro para mostrar o nível de risco.
+ * Recebe thresholds dinâmicos por doença.
  *
- * Thresholds:
- * - Verde (Baixo): < 10%
- * - Amarelo (Médio): 10% - 15%
- * - Vermelho (Alto): > 15%
- *
- * O gauge mostra de 0% a 30% para melhor visualização das zonas de risco.
+ * Props:
+ * - percentual: valor da previsão
+ * - tamanho: tamanho do gauge (default 200)
+ * - thresholds: { baixo: number, alto: number } (default Olho de Pavão: 10/15)
  */
 
 import React from 'react';
 
-const GaugeRisco = ({ percentual, tamanho = 200 }) => {
-  // O gauge vai de 0 a 30% para melhor visualização
-  const maxGauge = 30;
+const GaugeRisco = ({ percentual, tamanho = 200, thresholds = { baixo: 10, alto: 15 } }) => {
+  const { baixo, alto } = thresholds;
+  const maxGauge = alto * 2;
 
-  // Limitar percentual entre 0 e maxGauge para o gauge
+  // Limitar percentual entre 0 e maxGauge
   const percentualLimitado = Math.min(maxGauge, Math.max(0, percentual));
 
-  // Calcular ângulo (0% = -90°, 30% = 90°)
+  // Calcular ângulo (0% = -90°, maxGauge% = 90°)
   const angulo = (percentualLimitado / maxGauge) * 180 - 90;
 
-  // Determinar cor baseada no percentual
-  // < 10% = verde, 10-15% = amarelo, > 15% = vermelho
+  // Determinar cor baseada nos thresholds
   const getCor = (perc) => {
-    if (perc >= 15) return '#ef4444'; // vermelho
-    if (perc >= 10) return '#eab308'; // amarelo
-    return '#22c55e';                  // verde
+    if (perc >= alto) return '#ef4444';
+    if (perc >= baixo) return '#eab308';
+    return '#22c55e';
   };
 
   const cor = getCor(percentual);
 
   // Determinar texto do risco
   const getRisco = (perc) => {
-    if (perc >= 15) return 'ALTO';
-    if (perc >= 10) return 'MÉDIO';
+    if (perc >= alto) return 'ALTO';
+    if (perc >= baixo) return 'MÉDIO';
     return 'BAIXO';
   };
 
   const risco = getRisco(percentual);
 
+  // Arcos fixos e simétricos (mesma proporção visual do original)
+  // Verde: -90° a -30° | Amarelo: -30° a 0° | Vermelho: 0° a 90°
   return (
     <div className="flex flex-col items-center">
       <svg
@@ -59,7 +59,7 @@ const GaugeRisco = ({ percentual, tamanho = 200 }) => {
           strokeLinecap="round"
         />
 
-        {/* Verde (0-10%) - esquerda - de -90° a -30° */}
+        {/* Verde (baixo) - esquerda */}
         <path
           d="M 20 100 A 80 80 0 0 1 60 31.7"
           fill="none"
@@ -69,7 +69,7 @@ const GaugeRisco = ({ percentual, tamanho = 200 }) => {
           opacity="0.5"
         />
 
-        {/* Amarelo (10-15%) - meio - de -30° a 0° */}
+        {/* Amarelo (médio) - meio */}
         <path
           d="M 60 31.7 A 80 80 0 0 1 100 20"
           fill="none"
@@ -78,7 +78,7 @@ const GaugeRisco = ({ percentual, tamanho = 200 }) => {
           opacity="0.5"
         />
 
-        {/* Vermelho (15-30%) - direita - de 0° a 90° */}
+        {/* Vermelho (alto) - direita */}
         <path
           d="M 100 20 A 80 80 0 0 1 180 100"
           fill="none"
@@ -105,10 +105,10 @@ const GaugeRisco = ({ percentual, tamanho = 200 }) => {
         {/* Centro */}
         <circle cx="100" cy="100" r="5" fill="white" stroke={cor} strokeWidth="2" />
 
-        {/* Labels */}
+        {/* Labels dinâmicos */}
         <text x="15" y="120" className="text-xs fill-gray-500" textAnchor="start">0%</text>
-        <text x="100" y="15" className="text-xs fill-gray-500" textAnchor="middle">15%</text>
-        <text x="185" y="120" className="text-xs fill-gray-500" textAnchor="end">30%</text>
+        <text x="100" y="10" className="text-xs fill-gray-500" textAnchor="middle">{alto}%</text>
+        <text x="185" y="120" className="text-xs fill-gray-500" textAnchor="end">{maxGauge}%</text>
       </svg>
 
       {/* Valor e texto */}
