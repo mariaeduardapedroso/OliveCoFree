@@ -1,164 +1,197 @@
-# Olho de Pavão - Sistema de Previsão MVP
+# OliveCoFree - Sistema de Previsao de Doencas em Oliveiras
 
-Sistema de previsão de infecção por Olho de Pavão (Spilocaea oleagina) em oliveiras.
+Sistema preditivo para detecao precoce de doencas fungicas em oliveiras, desenvolvido no ambito de uma dissertacao de mestrado no Instituto Politecnico de Braganca (IPB), com o apoio do CeDRI e financiamento da Fundacao "la Caixa" e BPI.
 
-## Estrutura do Projeto (MVC)
+O modelo foi desenvolvido para cultivares moderadamente suscetiveis a gafa e olho de pavao, em olival tradicional e de sequeiro, para a regiao de Mirandela (Nordeste de Portugal).
+
+## Doencas Monitorizadas
+
+| Doenca | Agente | Thresholds |
+|---|---|---|
+| **Olho de Pavao** | *Spilocaea oleagina* | Baixo: <10%, Medio: 10-15%, Alto: >15% |
+| **Antracnose (Gafa)** | *Colletotrichum spp.* | Baixo: <8%, Medio: 8-12%, Alto: >12% |
+
+## Arquitetura
 
 ```
-OlhoPavao-MVP/
-├── src/
-│   ├── models/              # MODEL - Dados e lógica de dados
-│   │   ├── PrevisaoModel.js    # Dados de previsões (mock)
-│   │   ├── ClimaModel.js       # Dados climáticos (mock)
-│   │   ├── UsuarioModel.js     # Dados de usuários (mock)
-│   │   └── index.js
-│   │
-│   ├── views/               # VIEW - Componentes visuais
-│   │   └── components/
-│   │       ├── Card.jsx         # Card reutilizável
-│   │       ├── Button.jsx       # Botão reutilizável
-│   │       ├── Input.jsx        # Campo de input
-│   │       ├── Select.jsx       # Campo de seleção
-│   │       ├── GaugeRisco.jsx   # Velocímetro de risco
-│   │       ├── CardRisco.jsx    # Card de status de risco
-│   │       ├── CardClima.jsx    # Card de clima
-│   │       ├── Navbar.jsx       # Barra de navegação
-│   │       ├── Tabela.jsx       # Tabela de dados
-│   │       ├── GraficoLinha.jsx # Gráfico de linha (Chart.js)
-│   │       ├── Alerta.jsx       # Componente de alerta
-│   │       ├── Loading.jsx      # Componente de loading
-│   │       └── index.js
-│   │
-│   ├── controllers/         # CONTROLLER - Lógica de negócio
-│   │   ├── AuthController.js      # Lógica de autenticação
-│   │   ├── PrevisaoController.js  # Lógica de previsões
-│   │   ├── ClimaController.js     # Lógica de clima
-│   │   └── index.js
-│   │
-│   ├── pages/               # Páginas da aplicação
-│   │   ├── Login.jsx           # Página de login
-│   │   ├── Cadastro.jsx        # Página de cadastro
-│   │   ├── Dashboard.jsx       # Dashboard principal
-│   │   ├── Previsao.jsx        # Fazer nova previsão
-│   │   ├── Historico.jsx       # Histórico de previsões
-│   │   └── index.js
-│   │
-│   ├── components/          # Componentes auxiliares
-│   │   ├── Layout.jsx          # Layout com navbar
-│   │   └── RotaProtegida.jsx   # Proteção de rotas
-│   │
-│   ├── App.jsx              # Componente principal + rotas
-│   ├── main.jsx             # Entry point
-│   └── index.css            # Estilos globais (Tailwind)
+Frontend (React)          Backend (FastAPI)         Microsservicos (FastAPI)
+  :5173 / :80       --->    :8001             --->    :8002 (Olho de Pavao)
+                                                      :8003 (Antracnose)
+                              |
+                         PostgreSQL
+                           :5432
+```
+
+### Stack Tecnologico
+
+| Camada | Tecnologia |
+|---|---|
+| Frontend | React 18, Vite, Tailwind CSS, Chart.js, Lucide React |
+| Backend | FastAPI, SQLAlchemy, Pydantic, python-jose (JWT) |
+| ML Pipeline | scikit-learn, XGBoost, Ensemble (RF + XGBoost + Ridge) |
+| Base de Dados | PostgreSQL (Supabase remoto ou Docker local) |
+| Deploy | Docker Compose, Nginx |
+
+### Pipeline de Machine Learning
+
+- **Stepwise Feature Selection (AIC)** - Selecao automatica das melhores features
+- **Ensemble** - Combina Random Forest (40%), XGBoost (40%) e Ridge Regression (20%)
+- **Expanding Window** - Avaliacao com janela de expansao para simular treino incremental
+- **Clip 0-100%** - Garante previsoes dentro de limites biologicamente possiveis
+
+## Estrutura do Projeto
+
+```
+OliveCoFree/
+├── src/                          # Frontend React (MVC)
+│   ├── models/                     # Dados e logica
+│   │   ├── DoencaModel.js            # Definicoes das doencas e thresholds
+│   │   └── PrevisaoModel.js          # Mapeamento de previsoes
+│   ├── views/                      # Componentes visuais
+│   │   ├── components/               # Card, Button, GaugeRisco, Tabela, etc.
+│   │   └── icons/                    # Icones SVG personalizados
+│   ├── controllers/                # Logica de negocio
+│   │   ├── AuthController.js         # Autenticacao
+│   │   ├── PrevisaoController.js     # Previsoes
+│   │   ├── ClimaController.js        # Dados climaticos
+│   │   └── PesquisadorController.js  # Painel cientifico
+│   ├── pages/                      # Paginas da aplicacao
+│   │   ├── LandingPage.jsx           # Pagina inicial publica
+│   │   ├── Login.jsx / Cadastro.jsx  # Autenticacao
+│   │   ├── Dashboard.jsx             # Dashboard principal
+│   │   ├── Previsao.jsx              # Fazer previsao
+│   │   ├── Historico.jsx             # Historico com paginacao e filtros
+│   │   └── PainelCientifico.jsx      # Painel exclusivo para pesquisadores
+│   └── services/
+│       └── api.js                    # Comunicacao com o backend
 │
-├── tailwind.config.js       # Configuração do Tailwind
-├── postcss.config.js        # Configuração do PostCSS
-├── package.json
-└── README.md
+├── backend/                      # Backend FastAPI
+│   ├── app/
+│   │   ├── main.py                   # Aplicacao FastAPI
+│   │   ├── config.py                 # Configuracoes e variaveis de ambiente
+│   │   ├── routes/                   # Endpoints da API
+│   │   │   ├── auth.py                 # Autenticacao (JWT)
+│   │   │   ├── clima.py                # Dados climaticos
+│   │   │   ├── previsao.py             # Previsoes
+│   │   │   └── pesquisador.py          # Painel cientifico
+│   │   ├── services/                 # Logica de negocio
+│   │   ├── models/                   # Modelos SQLAlchemy
+│   │   └── schemas/                  # Schemas Pydantic
+│   ├── database/                   # Scripts de seed e migracoes
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── microsservico-olho-pavao/     # ML - Olho de Pavao
+│   ├── app/
+│   │   ├── main.py                   # API FastAPI
+│   │   ├── pipeline.py               # Preparacao de dados
+│   │   └── ml_models.py             # Ensemble (RF + XGBoost + Ridge)
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── microsservico-antracnose/     # ML - Antracnose
+│   ├── app/
+│   │   ├── main.py                   # API FastAPI
+│   │   ├── pipeline.py               # Preparacao de dados
+│   │   └── ml_models.py             # Ensemble (RF + XGBoost + Ridge)
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── docker-compose.yml            # Orquestracao de todos os servicos
+├── Dockerfile                    # Frontend (multi-stage: Node + Nginx)
+├── nginx.conf                    # Configuracao do proxy reverso
+└── scripts/                      # Scripts utilitarios
 ```
 
-## Telas do MVP
+## Paginas da Aplicacao
 
-1. **Login** (`/login`)
-   - Email e senha
-   - Link para cadastro
-   - Credenciais de teste: `maria@exemplo.com` / `123456`
+| Pagina | Rota | Descricao |
+|---|---|---|
+| Landing Page | `/` | Apresentacao do projeto e doencas monitorizadas |
+| Login | `/login` | Autenticacao com email e senha |
+| Cadastro | `/cadastro` | Registo de novos utilizadores |
+| Dashboard | `/app/dashboard` | Visao geral com alertas e previsoes da semana |
+| Previsao | `/app/previsao` | Fazer previsao com dados climaticos |
+| Historico | `/app/historico` | Historico de previsoes com filtros e exportacao CSV |
+| Painel Cientifico | `/app/painel-cientifico` | Metricas dos modelos, upload de dados, retreino (apenas pesquisadores) |
+| Perfil | `/app/perfil` | Gestao do perfil do utilizador |
 
-2. **Cadastro** (`/cadastro`)
-   - Formulário de novo usuário
-   - Validações de email e senha
+## Como Executar
 
-3. **Dashboard** (`/dashboard`)
-   - Card de status atual (risco)
-   - Gráfico de histórico
-   - Estatísticas resumidas
-   - Clima atual
-   - Ações rápidas
+### Desenvolvimento Local
 
-4. **Previsão** (`/previsao`)
-   - Seleção de semana/ano
-   - Entrada de dados climáticos
-   - Resultado com gauge de risco
-   - Recomendações
+**Pre-requisitos:** Node.js 18+, Python 3.11+
 
-5. **Histórico** (`/historico`)
-   - Tabela de previsões
-   - Gráfico de evolução
-   - Filtro por ano
-   - Exportar para CSV
-
-## Como Rodar
-
-### Pré-requisitos
-- Node.js 18+ instalado
-- npm ou yarn
-
-### Passos
-
-1. **Instalar dependências:**
 ```bash
-cd OlhoPavao-MVP
+# Terminal 1 - Frontend
+cd OliveCoFree
 npm install
-```
-
-2. **Iniciar servidor de desenvolvimento:**
-```bash
 npm run dev
+
+# Terminal 2 - Backend
+cd OliveCoFree/backend
+pip install -r requirements.txt
+python run.py
+
+# Terminal 3 - MS Olho de Pavao
+cd OliveCoFree/microsservico-olho-pavao
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8002
+
+# Terminal 4 - MS Antracnose
+cd OliveCoFree/microsservico-antracnose
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
-3. **Abrir no navegador:**
-```
-http://localhost:5173
-```
+### Docker (Producao)
 
-### Credenciais de Teste
-- **Email:** maria@exemplo.com
-- **Senha:** 123456
-
-## Tecnologias Utilizadas
-
-- **React 18** - Framework frontend
-- **Vite** - Build tool
-- **Tailwind CSS** - Estilização
-- **React Router DOM** - Navegação
-- **Chart.js + react-chartjs-2** - Gráficos
-- **Lucide React** - Ícones
-
-## Scripts Disponíveis
+**Pre-requisitos:** Docker e Docker Compose
 
 ```bash
-npm run dev      # Servidor de desenvolvimento
-npm run build    # Build de produção
-npm run preview  # Preview do build
+cd OliveCoFree
+cp backend/.env.example backend/.env
+# Editar backend/.env com as variaveis necessarias
+docker compose up -d --build
 ```
 
-## Arquitetura MVC
+Servicos disponiveis:
+- Frontend: http://localhost (porta 80)
+- Backend API: http://localhost:8001
+- Swagger: http://localhost:8001/docs
 
-### Model (Dados)
-- `PrevisaoModel.js` - Dados mock de previsões, funções de cálculo de risco
-- `ClimaModel.js` - Dados mock climáticos, funções de favorabilidade
-- `UsuarioModel.js` - Dados mock de usuários, autenticação
+### Portas
 
-### View (Interface)
-- Componentes reutilizáveis em `src/views/components/`
-- Cada componente é visual e recebe dados via props
-- Não contém lógica de negócio
+| Servico | Porta |
+|---|---|
+| Frontend (Nginx) | 80 |
+| Backend (FastAPI) | 8001 |
+| MS Olho de Pavao | 8002 |
+| MS Antracnose | 8003 |
+| PostgreSQL | 5432 |
 
-### Controller (Lógica)
-- `AuthController.js` - Login, logout, cadastro
-- `PrevisaoController.js` - Fazer previsão, obter histórico
-- `ClimaController.js` - Obter dados climáticos
+## Variaveis de Ambiente
 
-## Próximos Passos (Backend)
+O ficheiro `backend/.env` deve conter:
 
-Para conectar a um backend real:
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+JWT_SECRET=chave-secreta
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+```
 
-1. Substituir dados mock por chamadas API
-2. Implementar autenticação JWT
-3. Conectar ao modelo ML (FastAPI + scikit-learn)
-4. Integrar API de clima (Open-Meteo, IPMA)
-5. Usar banco de dados PostgreSQL
+No Docker, `DATABASE_URL` e as URLs dos microsservicos sao injetadas automaticamente pelo `docker-compose.yml`.
+
+## Tipos de Utilizadores
+
+| Tipo | Funcionalidades |
+|---|---|
+| **Produtor** | Dashboard, Previsao, Historico, Perfil |
+| **Pesquisador** | Tudo do produtor + Painel Cientifico (upload de dados, retreino de modelos, metricas) |
 
 ## Autor
 
-Projeto desenvolvido para tese IPB - Análise de Olho de Pavão em Oliveiras
+Maria Eduarda Pedroso - Dissertacao de Mestrado, Instituto Politecnico de Braganca (IPB)
+
+Projeto financiado pela Fundacao "la Caixa" e BPI, desenvolvido no CeDRI.
