@@ -421,7 +421,6 @@ const Previsao = () => {
                   {/* Gauge de Risco */}
                   <Card titulo="Visualização do Risco" icone={<CheckCircle size={24} />}>
                     <div className="flex flex-col items-center py-4">
-                      {console.log('[DEBUG GAUGE] doencaId:', resultado.doencaId, 'selecionada:', doencaSelecionada, 'thresholds:', getDoencaById(resultado.doencaId || doencaSelecionada).thresholds)}
                       <GaugeRisco
                         percentual={resultado.percentualInfectadas}
                         tamanho={200}
