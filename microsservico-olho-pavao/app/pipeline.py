@@ -119,22 +119,35 @@ def preparar_dataset_treino() -> pd.DataFrame:
 
 
 # ============================================================
-# JANELA DE EXPANSAO
+# JANELA DESLIZANTE (SLIDING WINDOW)
 # ============================================================
 
-def gerar_janelas_expansivas(df: pd.DataFrame, min_window: int = 5):
+def gerar_janelas_deslizantes(df: pd.DataFrame, tamanho_janela: int = 2):
     """
-    Gera janelas de expansao para treino incremental.
+    Gera janelas deslizantes para validacao temporal entre anos.
 
-    Cada janela inclui TODOS os dados ate a semana W.
-    Retorna tuplas (df_treino, df_teste_1_linha).
+    Treina com N anos consecutivos, testa no ano seguinte.
+    A janela desliza: o tamanho do treino mantem-se constante.
+
+    Exemplo com tamanho_janela=2:
+      Passo 1: Treino [2021, 2022] -> Teste [2023]
+      Passo 2: Treino [2022, 2023] -> Teste [2024]
+
+    Yields tuplas (anos_treino, ano_teste, df_treino, df_teste).
+    Se nao houver anos suficientes, nao yield nada.
     """
     df = df.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
+    anos = sorted(df['ano'].unique())
 
-    for i in range(min_window, len(df)):
-        train = df.iloc[:i]
-        test = df.iloc[i:i+1]
-        yield train, test
+    if len(anos) < tamanho_janela + 1:
+        return
+
+    for i in range(len(anos) - tamanho_janela):
+        anos_treino = anos[i:i + tamanho_janela]
+        ano_teste = anos[i + tamanho_janela]
+        train_df = df[df['ano'].isin(anos_treino)].copy().reset_index(drop=True)
+        test_df = df[df['ano'] == ano_teste].copy().reset_index(drop=True)
+        yield anos_treino, ano_teste, train_df, test_df
 
 
 # ============================================================

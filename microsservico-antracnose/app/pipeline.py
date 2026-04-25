@@ -113,13 +113,25 @@ def preparar_dataset_treino() -> pd.DataFrame:
     return df_final
 
 
-def gerar_janelas_expansivas(df: pd.DataFrame, min_window: int = 5):
-    """Gera janelas de expansao para treino incremental."""
+def gerar_janelas_deslizantes(df: pd.DataFrame, tamanho_janela: int = 2):
+    """
+    Gera janelas deslizantes para validacao temporal entre anos.
+
+    Treina com N anos consecutivos, testa no ano seguinte.
+    Yields tuplas (anos_treino, ano_teste, df_treino, df_teste).
+    """
     df = df.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
-    for i in range(min_window, len(df)):
-        train = df.iloc[:i]
-        test = df.iloc[i:i+1]
-        yield train, test
+    anos = sorted(df['ano'].unique())
+
+    if len(anos) < tamanho_janela + 1:
+        return
+
+    for i in range(len(anos) - tamanho_janela):
+        anos_treino = anos[i:i + tamanho_janela]
+        ano_teste = anos[i + tamanho_janela]
+        train_df = df[df['ano'].isin(anos_treino)].copy().reset_index(drop=True)
+        test_df = df[df['ano'] == ano_teste].copy().reset_index(drop=True)
+        yield anos_treino, ano_teste, train_df, test_df
 
 
 def calcular_features_do_input(

@@ -90,19 +90,7 @@ async def retreinar_modelo():
             detail=f"Erro ao retreinar modelo: {str(e)}"
         )
 
-    return ModeloInfo(
-        modelo=modelo.metricas.get('modelo', ''),
-        accuracy=modelo.metricas.get('accuracy', 0),
-        f1_score=modelo.metricas.get('f1_score', 0),
-        total_amostras_treino=modelo.dataset_info.get('total_amostras', 0),
-        anos_treino=modelo.dataset_info.get('anos', []),
-        features_utilizadas=modelo.features_utilizadas,
-        thresholds={
-            'baixo': f'< {THRESHOLD_MEDIO}%',
-            'medio': f'{THRESHOLD_MEDIO}% - {THRESHOLD_ALTO}%',
-            'alto': f'>= {THRESHOLD_ALTO}%',
-        },
-    )
+    return _build_modelo_info()
 
 
 @router.get("/modelo/info", response_model=ModeloInfo, tags=["Modelo"])
@@ -113,11 +101,25 @@ async def info_modelo():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Modelo ainda não está pronto."
         )
+    return _build_modelo_info()
 
+
+def _build_modelo_info() -> ModeloInfo:
+    """Constrói o objeto ModeloInfo a partir das métricas do modelo."""
+    m = modelo.metricas
     return ModeloInfo(
-        modelo=modelo.metricas.get('modelo', ''),
-        accuracy=modelo.metricas.get('accuracy', 0),
-        f1_score=modelo.metricas.get('f1_score', 0),
+        modelo=m.get('modelo', ''),
+        accuracy=m.get('accuracy', 0),
+        f1_score=m.get('f1_score', 0),
+        mae=m.get('mae'),
+        rmse=m.get('rmse'),
+        r2=m.get('r2'),
+        mae_sliding_window=m.get('mae_sliding_window'),
+        rmse_sliding_window=m.get('rmse_sliding_window'),
+        r2_sliding_window=m.get('r2_sliding_window'),
+        accuracy_sliding_window=m.get('accuracy_sliding_window'),
+        f1_score_sliding_window=m.get('f1_score_sliding_window'),
+        pesos_ensemble=m.get('pesos_ensemble'),
         total_amostras_treino=modelo.dataset_info.get('total_amostras', 0),
         anos_treino=modelo.dataset_info.get('anos', []),
         features_utilizadas=modelo.features_utilizadas,
