@@ -19,8 +19,21 @@ import {
 const mapearModelo = (m) => ({
   doencaId: m.doenca_id,
   modelo: m.modelo,
+  // Metricas no dataset completo
   accuracy: m.accuracy,
   f1Score: m.f1_score,
+  mae: m.mae,
+  rmse: m.rmse,
+  r2: m.r2,
+  // Metricas por janela deslizante (validacao temporal)
+  accuracySlidingWindow: m.accuracy_sliding_window,
+  f1ScoreSlidingWindow: m.f1_score_sliding_window,
+  maeSlidingWindow: m.mae_sliding_window,
+  rmseSlidingWindow: m.rmse_sliding_window,
+  r2SlidingWindow: m.r2_sliding_window,
+  // Pesos do ensemble (IVW)
+  pesosEnsemble: m.pesos_ensemble,
+  // Metadados
   totalAmostrasTreino: m.total_amostras_treino,
   anosTreino: m.anos_treino,
   featuresUtilizadas: m.features_utilizadas,

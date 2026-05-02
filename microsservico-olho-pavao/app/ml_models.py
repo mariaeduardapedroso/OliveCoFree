@@ -330,13 +330,21 @@ class ModeloOlhoPavao:
             for m in modelos_tmp.values():
                 m.fit(X_tr_s, y_tr)
 
+            # Pesos IVW DESTA janela (calculados sobre os erros de treino
+            # apenas, evitando data leakage do conjunto de teste)
+            preds_tr = {
+                name: np.clip(m.predict(X_tr_s), 0, 100)
+                for name, m in modelos_tmp.items()
+            }
+            pesos_janela = _calcular_pesos_ivw(y_tr, preds_tr)
+
             # Clipping aplicado a CADA modelo antes da media ponderada
             preds_te = {
                 name: np.clip(m.predict(X_te_s), 0, 100)
                 for name, m in modelos_tmp.items()
             }
             pred_ens = sum(
-                self.pesos[name] * preds_te[name] for name in preds_te
+                pesos_janela[name] * preds_te[name] for name in preds_te
             )
 
             y_real.extend(y_te.tolist())

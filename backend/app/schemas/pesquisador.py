@@ -11,8 +11,21 @@ class ModeloInfoItem(BaseModel):
     """Info de um modelo individual."""
     doenca_id: str
     modelo: str
+    # Metricas no dataset completo
     accuracy: float
     f1_score: float
+    mae: Optional[float] = None
+    rmse: Optional[float] = None
+    r2: Optional[float] = None
+    # Metricas por janela deslizante (validacao temporal)
+    mae_sliding_window: Optional[float] = None
+    rmse_sliding_window: Optional[float] = None
+    r2_sliding_window: Optional[float] = None
+    accuracy_sliding_window: Optional[float] = None
+    f1_score_sliding_window: Optional[float] = None
+    # Pesos do ensemble calculados por IVW
+    pesos_ensemble: Optional[dict] = None
+    # Metadados
     total_amostras_treino: int
     anos_treino: List[int]
     features_utilizadas: List[str]

@@ -39,6 +39,18 @@ const formatarPercentual = (valor) => {
   return `${(valor * 100).toFixed(1)}%`;
 };
 
+// MAE/RMSE chegam ja em pontos percentuais (ex: 1.48 -> "1.48%")
+const formatarPontos = (valor) => {
+  if (valor == null) return '—';
+  return `${Number(valor).toFixed(2)}%`;
+};
+
+// R2 e adimensional, mostrar com 3 casas decimais
+const formatarR2 = (valor) => {
+  if (valor == null) return '—';
+  return Number(valor).toFixed(3);
+};
+
 const formatarData = (dataStr) => {
   if (!dataStr) return '—';
   const d = new Date(dataStr);
@@ -238,31 +250,96 @@ const PainelCientifico = () => {
                   </div>
                 </div>
 
-                {/* Metricas principais */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-700">{formatarPercentual(m.accuracy)}</p>
-                    <p className="text-xs text-blue-600">Accuracy</p>
-                  </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-700">{formatarPercentual(m.f1Score)}</p>
-                    <p className="text-xs text-purple-600">F1-Score</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-700">{m.totalAmostrasTreino}</p>
-                    <p className="text-xs text-green-600">Amostras</p>
+                {/* Metricas - Dataset Completo (otimista) */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Dataset Completo <span className="text-gray-400 normal-case font-normal">(treino e teste nos mesmos dados)</span>
+                  </p>
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="text-center p-2 bg-blue-50 rounded-lg">
+                      <p className="text-base font-bold text-blue-700">{formatarPercentual(m.accuracy)}</p>
+                      <p className="text-[10px] text-blue-600">Accuracy</p>
+                    </div>
+                    <div className="text-center p-2 bg-purple-50 rounded-lg">
+                      <p className="text-base font-bold text-purple-700">{formatarPercentual(m.f1Score)}</p>
+                      <p className="text-[10px] text-purple-600">F1-Score</p>
+                    </div>
+                    <div className="text-center p-2 bg-orange-50 rounded-lg">
+                      <p className="text-base font-bold text-orange-700">{formatarPontos(m.mae)}</p>
+                      <p className="text-[10px] text-orange-600">MAE</p>
+                    </div>
+                    <div className="text-center p-2 bg-amber-50 rounded-lg">
+                      <p className="text-base font-bold text-amber-700">{formatarPontos(m.rmse)}</p>
+                      <p className="text-[10px] text-amber-600">RMSE</p>
+                    </div>
+                    <div className="text-center p-2 bg-teal-50 rounded-lg">
+                      <p className="text-base font-bold text-teal-700">{formatarR2(m.r2)}</p>
+                      <p className="text-[10px] text-teal-600">R²</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Detalhes */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Calendar size={14} />
-                    <span>Anos de treino: {m.anosTreino?.join(', ') || '—'}</span>
+                {/* Metricas - Janela Deslizante (validacao temporal) */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Janela Deslizante <span className="text-gray-400 normal-case font-normal">(validação temporal entre anos)</span>
+                  </p>
+                  {m.maeSlidingWindow == null && m.accuracySlidingWindow == null ? (
+                    <p className="text-xs text-gray-400 italic p-2 bg-gray-50 rounded-lg">
+                      Anos insuficientes para esta avaliação
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-5 gap-2">
+                      <div className="text-center p-2 bg-blue-50/60 rounded-lg border border-blue-100">
+                        <p className="text-base font-bold text-blue-700">{formatarPercentual(m.accuracySlidingWindow)}</p>
+                        <p className="text-[10px] text-blue-600">Accuracy</p>
+                      </div>
+                      <div className="text-center p-2 bg-purple-50/60 rounded-lg border border-purple-100">
+                        <p className="text-base font-bold text-purple-700">{formatarPercentual(m.f1ScoreSlidingWindow)}</p>
+                        <p className="text-[10px] text-purple-600">F1-Score</p>
+                      </div>
+                      <div className="text-center p-2 bg-orange-50/60 rounded-lg border border-orange-100">
+                        <p className="text-base font-bold text-orange-700">{formatarPontos(m.maeSlidingWindow)}</p>
+                        <p className="text-[10px] text-orange-600">MAE</p>
+                      </div>
+                      <div className="text-center p-2 bg-amber-50/60 rounded-lg border border-amber-100">
+                        <p className="text-base font-bold text-amber-700">{formatarPontos(m.rmseSlidingWindow)}</p>
+                        <p className="text-[10px] text-amber-600">RMSE</p>
+                      </div>
+                      <div className="text-center p-2 bg-teal-50/60 rounded-lg border border-teal-100">
+                        <p className="text-base font-bold text-teal-700">{formatarR2(m.r2SlidingWindow)}</p>
+                        <p className="text-[10px] text-teal-600">R²</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pesos do Ensemble (IVW) */}
+                {m.pesosEnsemble && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Pesos do Ensemble <span className="text-gray-400 normal-case font-normal">(Inverse-Variance Weighting)</span>
+                    </p>
+                    <div className="flex gap-2">
+                      {Object.entries(m.pesosEnsemble).map(([nome, peso]) => (
+                        <div key={nome} className="flex-1 text-center p-2 bg-gray-50 rounded-lg">
+                          <p className="text-sm font-bold text-gray-700">{(peso * 100).toFixed(1)}%</p>
+                          <p className="text-[10px] text-gray-500 uppercase">{nome}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                {/* Metadados */}
+                <div className="space-y-2 text-sm pt-3 border-t border-gray-100">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Database size={14} />
-                    <span>Features: {m.featuresUtilizadas?.length || 0}</span>
+                    <span>{m.totalAmostrasTreino} amostras · {m.featuresUtilizadas?.length || 0} features</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Calendar size={14} />
+                    <span>Anos: {m.anosTreino?.join(', ') || '—'}</span>
                   </div>
                   {m.thresholds && (
                     <div className="flex flex-wrap gap-2 mt-2">
