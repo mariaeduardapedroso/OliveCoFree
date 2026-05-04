@@ -29,33 +29,20 @@ def preparar_dataset_treino() -> pd.DataFrame:
         print("[Pipeline] AVISO: Tabela dados_antracnose vazia!")
         return pd.DataFrame()
 
-    df_antracnose = df_antracnose.rename(columns={'olival_parcela': 'parcela'})
     df_antracnose['data'] = pd.to_datetime(df_antracnose['data'])
+    df_antracnose['incidencia'] = pd.to_numeric(df_antracnose['incidencia'], errors='coerce').fillna(0)
+    df_antracnose['severidade'] = pd.to_numeric(df_antracnose['severidade'], errors='coerce').fillna(0)
     df_antracnose['semana_do_ano'] = df_antracnose['data'].dt.isocalendar().week.astype(int)
     df_antracnose['ano'] = df_antracnose['data'].dt.year
+    df_antracnose['infectada'] = (df_antracnose['incidencia'] > 0).astype(int)
 
-    df_agg = (
-        df_antracnose
-        .groupby(['data', 'parcela', 'arvore', 'semana_do_ano', 'ano'])
-        .agg(
-            total_azeitonas=('incidencia', 'count'),
-            azeitonas_infectadas=('incidencia', 'sum'),
-            severidade_media=('severidade', 'mean'),
-        )
-        .reset_index()
-    )
-    df_agg['perc_infectadas'] = (
-        df_agg['azeitonas_infectadas'] / df_agg['total_azeitonas'] * 100
-    ).round(2)
-    df_agg['infectado'] = (df_agg['perc_infectadas'] >= PERCENTAGEM_INFECTADO).astype(int)
-
-    df_doenca_sem = df_agg.groupby(['ano', 'semana_do_ano']).agg(
-        total_azeitonas=('total_azeitonas', 'sum'),
-        azeitonas_infectadas=('azeitonas_infectadas', 'sum'),
-        severidade_media=('severidade_media', 'mean'),
+    df_doenca_sem = df_antracnose.groupby(['ano', 'semana_do_ano']).agg(
+        total_oliveiras=('infectada', 'count'),
+        oliveiras_infectadas=('infectada', 'sum'),
+        severidade_media=('severidade', 'mean'),
     ).reset_index()
     df_doenca_sem['perc_infectadas'] = (
-        df_doenca_sem['azeitonas_infectadas'] / df_doenca_sem['total_azeitonas'] * 100
+        df_doenca_sem['oliveiras_infectadas'] / df_doenca_sem['total_oliveiras'] * 100
     ).round(2)
     df_doenca_sem['infectado'] = (
         df_doenca_sem['perc_infectadas'] >= PERCENTAGEM_INFECTADO
@@ -78,9 +65,13 @@ def preparar_dataset_treino() -> pd.DataFrame:
     })
     df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
 
-    for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
-        if col in df_clima.columns:
-            df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
+    # Remove dias com valores invalidos (igual ao notebook)
+    linhas_antes = len(df_clima)
+    df_clima = df_clima[df_clima['temp_min'] >= -30]
+    df_clima = df_clima[df_clima['humidade'] >= -30]
+    df_clima = df_clima[df_clima['temp_media'] >= -30]
+    df_clima = df_clima[df_clima['precipitacao'] >= -30]
+    print(f"[Pipeline] Clima: {linhas_antes} -> {len(df_clima)} linhas (removidas {linhas_antes - len(df_clima)} com valores < -30)")
 
     df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
         temp_media_semana=('temp_media', 'mean'),

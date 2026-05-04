@@ -76,9 +76,13 @@ def preparar_dataset_treino() -> pd.DataFrame:
     })
     df_clima['semana_do_ano'] = df_clima['data'].dt.isocalendar().week.astype(int)
 
-    for col in ['temp_media', 'temp_max', 'temp_min', 'humidade', 'vento', 'precipitacao']:
-        if col in df_clima.columns:
-            df_clima[col] = df_clima[col].where(df_clima[col] >= -100, np.nan).ffill()
+    # Remove dias com valores invalidos (igual ao notebook)
+    linhas_antes = len(df_clima)
+    df_clima = df_clima[df_clima['temp_min'] >= -30]
+    df_clima = df_clima[df_clima['humidade'] >= -30]
+    df_clima = df_clima[df_clima['temp_media'] >= -30]
+    df_clima = df_clima[df_clima['precipitacao'] >= -30]
+    print(f"[Pipeline] Clima: {linhas_antes} -> {len(df_clima)} linhas (removidas {linhas_antes - len(df_clima)} com valores < -30)")
 
     # Agregar clima por semana (medias semanais + novas features)
     df_clima_sem = df_clima.groupby(['ano', 'semana_do_ano']).agg(
