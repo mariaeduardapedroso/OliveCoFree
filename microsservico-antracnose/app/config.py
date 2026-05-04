@@ -31,7 +31,7 @@ CANDIDATE_FEATURES = [
     'amplitude_termica',
     'humidade_semana',
     'precipitacao_semana',
-    'precipitacao_acumulada_2sem',
+    'precipitacao_2sem_anterior',
     'vento_semana',
     'temp_media_2sem_anterior',
     'humidade_2sem_anterior',

@@ -88,7 +88,7 @@ def preparar_dataset_treino() -> pd.DataFrame:
         humidade_semana=('humidade', 'mean'),
         precipitacao_semana=('precipitacao', 'mean'),
         vento_semana=('vento', 'mean'),
-        dias_chuva_semana=('precipitacao', lambda x: (x > 0.1).sum()),
+        dias_chuva_semana=('precipitacao', lambda x: (x > 0.1).sum() / len(x)),
     ).reset_index()
 
     # Amplitude termica
@@ -98,9 +98,7 @@ def preparar_dataset_treino() -> pd.DataFrame:
     df_clima_sem = df_clima_sem.sort_values(['ano', 'semana_do_ano']).reset_index(drop=True)
 
     # Features com lag temporal
-    df_clima_sem['precipitacao_acumulada_2sem'] = (
-        df_clima_sem['precipitacao_semana'].rolling(2, min_periods=1).sum()
-    )
+    df_clima_sem['precipitacao_2sem_anterior'] = df_clima_sem['precipitacao_semana'].shift(1).fillna(0)
     df_clima_sem['temp_media_2sem_anterior'] = df_clima_sem['temp_media_semana'].shift(1).fillna(0)
     df_clima_sem['humidade_2sem_anterior'] = df_clima_sem['humidade_semana'].shift(1).fillna(0)
 
@@ -178,7 +176,7 @@ def calcular_features_do_input(
         'amplitude_termica': amplitude,
         'humidade_semana': humidade,
         'precipitacao_semana': precipitacao,
-        'precipitacao_acumulada_2sem': precipitacao,
+        'precipitacao_2sem_anterior': 0.0,
         'vento_semana': velocidade_vento,
         'temp_media_2sem_anterior': 0.0,
         'humidade_2sem_anterior': 0.0,
