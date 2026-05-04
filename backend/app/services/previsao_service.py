@@ -14,6 +14,7 @@ from ..models.previsao import Previsao
 from ..models.doenca import Doenca
 from ..schemas.previsao import PrevisaoCreate
 from ..config import MICROSSERVICO_OLHO_PAVAO_URL, MICROSSERVICO_ANTRACNOSE_URL
+from .clima_service import obter_clima_semana
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,13 @@ _MICROSSERVICO_URLS = {
 }
 
 
+def _calcular_semana_anterior(semana: int, ano: int) -> tuple[int, int]:
+    """Devolve (semana_anterior, ano_anterior). Se semana=1 -> (52, ano-1)."""
+    if semana <= 1:
+        return 52, ano - 1
+    return semana - 1, ano
+
+
 async def chamar_microsservico(
     doenca_id: str,
     semana: int,
@@ -52,6 +60,9 @@ async def chamar_microsservico(
     humidade: float,
     precipitacao: float,
     velocidade_vento: float,
+    temperatura_media_anterior: float,
+    humidade_anterior: float,
+    precipitacao_anterior: float,
 ) -> dict:
     """Chama o microsserviço de previsão correspondente à doença."""
     base_url = _MICROSSERVICO_URLS.get(doenca_id)
@@ -67,6 +78,9 @@ async def chamar_microsservico(
         "humidade": humidade,
         "precipitacao": precipitacao,
         "velocidade_vento": velocidade_vento or 0.0,
+        "temperatura_media_anterior": temperatura_media_anterior,
+        "humidade_anterior": humidade_anterior,
+        "precipitacao_anterior": precipitacao_anterior,
     }
 
     url = f"{base_url}/previsao"
@@ -96,6 +110,23 @@ async def criar_previsao(
     previsao_data: PrevisaoCreate
 ) -> Previsao:
     """Cria uma nova previsão chamando o microsserviço correspondente."""
+    # Buscar clima da semana anterior (lags) - estrito: falha 503 se Open-Meteo cair
+    semana_ant, ano_ant = _calcular_semana_anterior(
+        previsao_data.semana, previsao_data.ano
+    )
+    try:
+        clima_anterior = await obter_clima_semana(
+            semana_ant, ano_ant, permitir_mock=False
+        )
+    except Exception as e:
+        logger.error(
+            f"Open-Meteo indisponivel para semana {semana_ant}/{ano_ant}: {e}"
+        )
+        raise Exception(
+            "Nao conseguimos obter o clima da semana anterior necessario "
+            "para a previsao. Por favor, tenta de novo daqui a alguns instantes."
+        )
+
     resultado = await chamar_microsservico(
         doenca_id=previsao_data.doenca_id,
         semana=previsao_data.semana,
@@ -106,6 +137,9 @@ async def criar_previsao(
         humidade=previsao_data.humidade or 70.0,
         precipitacao=previsao_data.precipitacao or 10.0,
         velocidade_vento=previsao_data.velocidade_vento or 0.0,
+        temperatura_media_anterior=clima_anterior["temperatura_media"],
+        humidade_anterior=clima_anterior["humidade_media"],
+        precipitacao_anterior=clima_anterior["precipitacao_media"],
     )
 
     percentual = resultado["percentual_infeccao"]

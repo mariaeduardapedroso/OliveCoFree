@@ -131,9 +131,18 @@ def calcular_features_do_input(
     humidade: float,
     precipitacao: float,
     velocidade_vento: float = 0.0,
+    temperatura_media_anterior: Optional[float] = None,
+    humidade_anterior: Optional[float] = None,
+    precipitacao_anterior: Optional[float] = None,
     features_selecionadas: Optional[List[str]] = None,
 ) -> pd.Series:
-    """Calcula features a partir dos dados climaticos (Colletotrichum spp.)."""
+    """
+    Calcula features a partir dos dados climaticos (Colletotrichum spp.).
+
+    Os parametros *_anterior representam os lags da semana anterior
+    (normalmente preenchidos pelo backend via Open-Meteo). Se ausentes,
+    sao tratados como 0.0 (comportamento legado).
+    """
     amplitude = temperatura_maxima - temperatura_minima
 
     all_features = {
@@ -144,10 +153,10 @@ def calcular_features_do_input(
         'amplitude_termica': amplitude,
         'humidade_semana': humidade,
         'precipitacao_semana': precipitacao,
-        'precipitacao_2sem_anterior': 0.0,
+        'precipitacao_2sem_anterior': precipitacao_anterior if precipitacao_anterior is not None else 0.0,
         'vento_semana': velocidade_vento,
-        'temp_media_2sem_anterior': 0.0,
-        'humidade_2sem_anterior': 0.0,
+        'temp_media_2sem_anterior': temperatura_media_anterior if temperatura_media_anterior is not None else 0.0,
+        'humidade_2sem_anterior': humidade_anterior if humidade_anterior is not None else 0.0,
         'dias_chuva_semana': 1.0 if precipitacao > 0.1 else 0.0,
     }
 

@@ -134,7 +134,11 @@ async def obter_clima_hoje() -> Optional[dict]:
         return _get_mock_clima_hoje()
 
 
-async def obter_clima_semana(semana: int, ano: int) -> Optional[dict]:
+async def obter_clima_semana(
+    semana: int,
+    ano: int,
+    permitir_mock: bool = True,
+) -> Optional[dict]:
     """
     Busca dados climáticos de uma semana específica.
     Calcula médias para usar na previsão.
@@ -142,6 +146,10 @@ async def obter_clima_semana(semana: int, ano: int) -> Optional[dict]:
     Args:
         semana: Número da semana (1-52)
         ano: Ano (ex: 2026)
+        permitir_mock: Se True (default), devolve mock em caso de erro.
+            Se False, propaga a excepção (usado pelo previsao_service para
+            falhar 503 quando Open-Meteo está indisponível e não temos
+            como obter os lags climáticos da semana anterior).
 
     Returns:
         Médias climáticas da semana
@@ -187,11 +195,16 @@ async def obter_clima_semana(semana: int, ano: int) -> Optional[dict]:
         ventos = daily.get("wind_speed_10m_max", [])
 
         if not temps:
+            if not permitir_mock:
+                raise RuntimeError(
+                    f"Open-Meteo nao retornou dados para semana {semana}/{ano}"
+                )
             return _get_mock_clima_semana(semana, ano)
 
         temp_media = sum(temps) / len(temps)
         hum_media = sum(humidades) / len(humidades) if humidades else 70.0
         precip_total = sum(precipitacoes) if precipitacoes else 0.0
+        precip_media = precip_total / len(precipitacoes) if precipitacoes else 0.0
         vento_medio = sum(ventos) / len(ventos) if ventos else 10.0
         dias_chuva = sum(1 for p in precipitacoes if p > 0.5) if precipitacoes else 0
 
@@ -205,6 +218,7 @@ async def obter_clima_semana(semana: int, ano: int) -> Optional[dict]:
             "temperatura_max": round(max(temps_max) if temps_max else temp_media + 5, 1),
             "humidade_media": round(hum_media, 1),
             "precipitacao_total": round(precip_total, 1),
+            "precipitacao_media": round(precip_media, 2),
             "vento_medio": round(vento_medio, 1),
             "dias_com_chuva": dias_chuva,
             "localizacao": "Mirandela, Portugal",
@@ -213,6 +227,8 @@ async def obter_clima_semana(semana: int, ano: int) -> Optional[dict]:
 
     except Exception as e:
         print(f"Erro ao buscar clima da semana: {e}")
+        if not permitir_mock:
+            raise
         return _get_mock_clima_semana(semana, ano)
 
 
@@ -289,6 +305,7 @@ def _get_mock_clima_semana(semana: int, ano: int) -> dict:
         "temperatura_max": round(temp_base + 6, 1),
         "humidade_media": round(hum_base, 1),
         "precipitacao_total": round(precip, 1),
+        "precipitacao_media": round(precip / 7, 2),
         "vento_medio": round(random.uniform(8, 18), 1),
         "dias_com_chuva": random.randint(0, 5),
         "localizacao": "Mirandela, Portugal",

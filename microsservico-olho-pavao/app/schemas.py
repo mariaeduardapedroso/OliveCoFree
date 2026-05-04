@@ -19,6 +19,18 @@ class PrevisaoRequest(BaseModel):
     precipitacao: float = Field(..., ge=0, description="Precipitação média diária da semana (mm/dia)")
     velocidade_vento: float = Field(default=0.0, ge=0, description="Velocidade média diária do vento (m/s)")
 
+    # Lags da semana anterior (preenchidos pelo backend via Open-Meteo).
+    # Opcionais para retrocompatibilidade: se ausentes, microsservico usa 0.0.
+    temperatura_media_anterior: Optional[float] = Field(
+        default=None, description="Temperatura média da semana anterior (°C)"
+    )
+    humidade_anterior: Optional[float] = Field(
+        default=None, ge=0, le=100, description="Humidade relativa média da semana anterior (%)"
+    )
+    precipitacao_anterior: Optional[float] = Field(
+        default=None, ge=0, description="Precipitação média diária da semana anterior (mm/dia)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "examples": [

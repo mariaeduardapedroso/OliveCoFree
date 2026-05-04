@@ -54,6 +54,9 @@ async def fazer_previsao(request: PrevisaoRequest):
         humidade=request.humidade,
         precipitacao=request.precipitacao,
         velocidade_vento=request.velocidade_vento,
+        temperatura_media_anterior=request.temperatura_media_anterior,
+        humidade_anterior=request.humidade_anterior,
+        precipitacao_anterior=request.precipitacao_anterior,
         features_selecionadas=modelo.features_utilizadas,
     )
 
