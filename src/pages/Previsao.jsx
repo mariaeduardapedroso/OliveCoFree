@@ -78,13 +78,19 @@ const Previsao = () => {
     }
   }, []);
 
-  // Carregar dados climáticos quando mudar a semana (agora assíncrono)
+  // Carregar dados climáticos quando mudar a semana (agora assíncrono).
+  // Modo estrito: nao usa mock. Se Open-Meteo nao tiver dados (ex: semana
+  // muito futura), deixa os campos em branco para o utilizador preencher.
   useEffect(() => {
     const carregarClima = async () => {
       if (semanaEscolhida) {
         setCarregandoClima(true);
         try {
-          const clima = await obterClimaSemana(semanaEscolhida.semana, semanaEscolhida.ano);
+          const clima = await obterClimaSemana(
+            semanaEscolhida.semana,
+            semanaEscolhida.ano,
+            true  // estrito: sem fallback mock
+          );
           if (clima) {
             const dados = formatarDadosClima(clima);
             setTemperatura(dados.temperatura.toString());
@@ -94,9 +100,26 @@ const Previsao = () => {
             setPrecipitacao(dados.precipitacao.toString());
             setVelocidadeVento(dados.velocidadeVento?.toString() || '');
             setFonteClima(clima.fonte || 'mock');
+          } else {
+            // Sem dados disponiveis - deixar campos em branco
+            setTemperatura('');
+            setTemperaturaMaxima('');
+            setTemperaturaMinima('');
+            setHumidade('');
+            setPrecipitacao('');
+            setVelocidadeVento('');
+            setFonteClima('indisponivel');
           }
         } catch (error) {
           console.error('Erro ao carregar clima:', error);
+          // Erro de rede - tambem deixa em branco
+          setTemperatura('');
+          setTemperaturaMaxima('');
+          setTemperaturaMinima('');
+          setHumidade('');
+          setPrecipitacao('');
+          setVelocidadeVento('');
+          setFonteClima('indisponivel');
         }
         setCarregandoClima(false);
       }
@@ -252,8 +275,18 @@ const Previsao = () => {
                   <span className="text-xs text-blue-600 animate-pulse">A carregar...</span>
                 )}
                 {!carregandoClima && fonteClima && (
-                  <span className={`text-xs px-2 py-1 rounded ${fonteClima === 'api' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {fonteClima === 'api' ? 'Dados reais (Mirandela)' : 'Dados simulados'}
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    fonteClima === 'api'
+                      ? 'bg-green-100 text-green-700'
+                      : fonteClima === 'indisponivel'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {fonteClima === 'api'
+                      ? 'Dados reais (Mirandela)'
+                      : fonteClima === 'indisponivel'
+                        ? 'Sem dados — preenche manualmente'
+                        : 'Dados simulados'}
                   </span>
                 )}
               </div>

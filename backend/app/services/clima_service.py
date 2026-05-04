@@ -155,14 +155,17 @@ async def obter_clima_semana(
         Médias climáticas da semana
     """
     try:
-        # Calcular datas da semana
-        # ISO week: primeira semana é a que tem o primeiro Quinta-feira do ano
-        primeira_segunda = datetime.strptime(f"{ano}-W{semana:02d}-1", "%Y-W%W-%w")
+        # Calcular datas da semana usando ISO week (alinhado com isocalendar()
+        # do resto do projecto, incluindo o pipeline ML).
+        primeira_segunda = datetime.fromisocalendar(ano, semana, 1)
         ultima_domingo = primeira_segunda + timedelta(days=6)
+        primeira_segunda_str = primeira_segunda.strftime("%Y-%m-%d")
+        ultima_domingo_str = ultima_domingo.strftime("%Y-%m-%d")
 
-        # Se a semana é futura, buscar previsão
-        hoje = datetime.now()
-
+        # past_days=92 + forecast_days=16 sao os maximos da Open-Meteo
+        # (-92 a +15 dias do hoje). Usamos isto SEM start_date/end_date
+        # porque a Open-Meteo recusa a combinacao (mutuamente exclusivos).
+        # Filtramos os dias pedidos da resposta abaixo.
         params = {
             "latitude": MIRANDELA_COORDS["latitude"],
             "longitude": MIRANDELA_COORDS["longitude"],
@@ -175,8 +178,8 @@ async def obter_clima_semana(
                 "wind_speed_10m_max"
             ],
             "timezone": "Europe/Lisbon",
-            "start_date": primeira_segunda.strftime("%Y-%m-%d"),
-            "end_date": ultima_domingo.strftime("%Y-%m-%d")
+            "forecast_days": 16,
+            "past_days": 92,
         }
 
         async with httpx.AsyncClient() as client:
@@ -185,19 +188,31 @@ async def obter_clima_semana(
             data = response.json()
 
         daily = data.get("daily", {})
+        time_list = daily.get("time", [])
 
-        # Calcular médias da semana
-        temps = daily.get("temperature_2m_mean", [])
-        temps_min = daily.get("temperature_2m_min", [])
-        temps_max = daily.get("temperature_2m_max", [])
-        humidades = daily.get("relative_humidity_2m_mean", [])
-        precipitacoes = daily.get("precipitation_sum", [])
-        ventos = daily.get("wind_speed_10m_max", [])
+        # Indices dos dias da semana pedida (entre primeira_segunda e ultima_domingo)
+        idxs = [
+            i for i, d in enumerate(time_list)
+            if primeira_segunda_str <= d <= ultima_domingo_str
+        ]
+
+        # Filtrar listas para os 7 dias da semana pedida
+        def _pick(key):
+            full = daily.get(key, [])
+            return [full[i] for i in idxs if i < len(full)]
+
+        temps = _pick("temperature_2m_mean")
+        temps_min = _pick("temperature_2m_min")
+        temps_max = _pick("temperature_2m_max")
+        humidades = _pick("relative_humidity_2m_mean")
+        precipitacoes = _pick("precipitation_sum")
+        ventos = _pick("wind_speed_10m_max")
 
         if not temps:
             if not permitir_mock:
                 raise RuntimeError(
-                    f"Open-Meteo nao retornou dados para semana {semana}/{ano}"
+                    f"Open-Meteo nao tem dados para a semana {semana}/{ano} "
+                    f"(fora do range -92/+15 dias do dia de hoje)"
                 )
             return _get_mock_clima_semana(semana, ano)
 
@@ -292,7 +307,7 @@ def _get_mock_clima_semana(semana: int, ano: int) -> dict:
         hum_base = random.uniform(70, 90)
         precip = random.uniform(10, 35)
 
-    primeira_segunda = datetime.strptime(f"{ano}-W{semana:02d}-1", "%Y-W%W-%w")
+    primeira_segunda = datetime.fromisocalendar(ano, semana, 1)
     ultima_domingo = primeira_segunda + timedelta(days=6)
 
     return {

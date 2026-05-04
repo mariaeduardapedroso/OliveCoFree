@@ -79,13 +79,16 @@ export const obterClimaAtual = async () => {
  * Tenta buscar do backend (média semanal), senão usa mock.
  * @param {number} semana
  * @param {number} ano
+ * @param {boolean} estrito - Se true, NAO usa fallback mock: devolve null
+ *   quando o backend/Open-Meteo nao tem dados reais. Usado na pagina de
+ *   Previsao para nao mostrar valores inventados ao utilizador.
  * @returns {Object|null}
  */
-export const obterClimaSemana = async (semana, ano) => {
+export const obterClimaSemana = async (semana, ano, estrito = false) => {
   try {
     // Tentar buscar do backend
     if (await isBackendOnline()) {
-      const dados = await buscarClimaSemana(semana, ano);
+      const dados = await buscarClimaSemana(semana, ano, !estrito);
       return {
         temperatura: { media: dados.temperatura_media, min: dados.temperatura_min, max: dados.temperatura_max },
         humidade: { media: dados.humidade_media, min: dados.humidade_media - 10, max: dados.humidade_media + 10 },
@@ -97,7 +100,16 @@ export const obterClimaSemana = async (semana, ano) => {
       };
     }
   } catch (error) {
-    console.warn('Backend indisponível para semana, usando mock:', error);
+    console.warn('Backend indisponível para semana:', error);
+    if (estrito) {
+      // Modo estrito: nao usa mock, devolve null para o chamador deixar
+      // os campos em branco e pedir ao utilizador para preencher.
+      return null;
+    }
+  }
+
+  if (estrito) {
+    return null;
   }
 
   // Fallback: usar mock

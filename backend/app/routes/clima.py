@@ -51,7 +51,11 @@ async def get_clima_hoje():
 @router.get("/semana/{semana}")
 async def get_clima_semana(
     semana: int,
-    ano: Optional[int] = Query(default=None, description="Ano (default: ano atual)")
+    ano: Optional[int] = Query(default=None, description="Ano (default: ano atual)"),
+    permitir_mock: bool = Query(
+        default=True,
+        description="Se False, devolve 503 quando Open-Meteo nao tem dados (sem fallback mock)"
+    )
 ):
     """
     Retorna médias climáticas de uma semana específica.
@@ -61,6 +65,9 @@ async def get_clima_semana(
     Args:
         semana: Número da semana (1-52)
         ano: Ano (opcional, default: ano atual)
+        permitir_mock: Default True (compatibilidade). Quando False,
+            devolve 503 se Open-Meteo nao tiver dados (sem fallback mock).
+            Usado pela pagina de Previsao para nao mostrar dados inventados.
 
     Returns:
         - temperatura_media: Temperatura média da semana (°C)
@@ -77,7 +84,13 @@ async def get_clima_semana(
     if ano is None:
         ano = datetime.now().year
 
-    dados = await obter_clima_semana(semana, ano)
+    try:
+        dados = await obter_clima_semana(semana, ano, permitir_mock=permitir_mock)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Não foi possível obter dados climáticos da semana: {e}"
+        )
 
     if not dados:
         raise HTTPException(

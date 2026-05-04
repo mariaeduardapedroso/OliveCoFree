@@ -146,8 +146,9 @@ export const buscarClimaHoje = async () => {
   return response.data;
 };
 
-export const buscarClimaSemana = async (semana, ano) => {
-  const response = await fetchAPI(`/clima/semana/${semana}?ano=${ano}`);
+export const buscarClimaSemana = async (semana, ano, permitirMock = true) => {
+  const url = `/clima/semana/${semana}?ano=${ano}&permitir_mock=${permitirMock}`;
+  const response = await fetchAPI(url);
   return response.data;
 };
 

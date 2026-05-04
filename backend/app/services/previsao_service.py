@@ -50,6 +50,42 @@ def _calcular_semana_anterior(semana: int, ano: int) -> tuple[int, int]:
     return semana - 1, ano
 
 
+def _ultima_semana_forecast() -> tuple[int, int]:
+    """
+    Devolve (semana, ano) da ultima semana ISO completa coberta pela
+    Open-Meteo forecast (today + 15 dias, dado que forecast_days=16
+    inclui o dia de hoje).
+    """
+    hoje = datetime.now()
+    limite = hoje + timedelta(days=15)
+    ano_iso, semana_iso, _ = limite.isocalendar()
+    # Se o Domingo (dia 7) da semana ISO de `limite` cair alem do limite,
+    # recuamos para a semana anterior (que esta totalmente disponivel).
+    domingo = datetime.fromisocalendar(ano_iso, semana_iso, 7)
+    if domingo > limite:
+        domingo_anterior = domingo - timedelta(days=7)
+        ano_iso, semana_iso, _ = domingo_anterior.isocalendar()
+    return semana_iso, ano_iso
+
+
+def _clamp_semana_para_forecast(
+    semana: int, ano: int
+) -> tuple[int, int, bool]:
+    """
+    Se (semana, ano) for futura demais para a Open-Meteo, devolve a ultima
+    semana com forecast disponivel.
+
+    Returns:
+        (semana_a_usar, ano_a_usar, foi_clamped)
+    """
+    semana_lim, ano_lim = _ultima_semana_forecast()
+    monday_pedida = datetime.fromisocalendar(ano, semana, 1)
+    monday_limite = datetime.fromisocalendar(ano_lim, semana_lim, 1)
+    if monday_pedida > monday_limite:
+        return semana_lim, ano_lim, True
+    return semana, ano, False
+
+
 async def chamar_microsservico(
     doenca_id: str,
     semana: int,
@@ -110,17 +146,27 @@ async def criar_previsao(
     previsao_data: PrevisaoCreate
 ) -> Previsao:
     """Cria uma nova previsão chamando o microsserviço correspondente."""
-    # Buscar clima da semana anterior (lags) - estrito: falha 503 se Open-Meteo cair
+    # Buscar clima da semana anterior (lags) - estrito: falha 503 se Open-Meteo cair.
+    # Se a semana anterior estiver alem do range de forecast da Open-Meteo
+    # (~16 dias no futuro), fazemos clamp para a ultima semana disponivel.
     semana_ant, ano_ant = _calcular_semana_anterior(
         previsao_data.semana, previsao_data.ano
     )
+    semana_busca, ano_busca, foi_clamped = _clamp_semana_para_forecast(
+        semana_ant, ano_ant
+    )
+    if foi_clamped:
+        logger.warning(
+            f"Semana anterior {semana_ant}/{ano_ant} alem do range Open-Meteo. "
+            f"Usando forecast da semana {semana_busca}/{ano_busca} como aproximacao."
+        )
     try:
         clima_anterior = await obter_clima_semana(
-            semana_ant, ano_ant, permitir_mock=False
+            semana_busca, ano_busca, permitir_mock=False
         )
     except Exception as e:
         logger.error(
-            f"Open-Meteo indisponivel para semana {semana_ant}/{ano_ant}: {e}"
+            f"Open-Meteo indisponivel para semana {semana_busca}/{ano_busca}: {e}"
         )
         raise Exception(
             "Nao conseguimos obter o clima da semana anterior necessario "
